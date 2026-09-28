@@ -10,7 +10,7 @@ Plan og faser: `docs/plan.md`. Læs den relevante del, før du bygger noget nyt.
 
 ## Stack
 
-- Frontend: React 18 + Vite + TypeScript (strict). Ren CSS, lyst og Apple-inspireret, dansk UI-tekst.
+- Frontend: React 18 + Vite + TypeScript (strict). Ren CSS, mørkt studie-look (billederne er det lyse på skærmen; farver bærer status), dansk UI-tekst.
 - Backend: Supabase — Postgres, Edge Functions (Deno), Auth, Storage.
 - Database-ændringer KUN via migrations i `supabase/migrations/` (`NNN_beskrivelse.sql`).
 - AI-kald KUN fra Edge Functions. Model vælges pr. opgavetype i `_shared/model-config.ts`.

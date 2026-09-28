@@ -11,7 +11,7 @@
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
-    "types": ["node"]
+    "types": ["node", "vite/client"]
   },
   "include": ["tests", "fixtures", "product.config.json", "prototype/build.mjs", "supabase/functions/_shared", "vite.config.ts", "vitest.config.ts", "vitest.db.config.ts"],
   "exclude": ["supabase/functions/_shared/runtime.ts"]

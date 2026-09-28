@@ -8,7 +8,33 @@ export const texts = {
   common: {
     cancel: 'Fortryd',
     hide: 'Skjul',
+    approve: 'Godkend',
+    reject: 'Afvis',
+    save: 'Gem',
+    open: 'Åbn',
+    loading: 'Henter …',
+    simulated: 'Simuleret provider — ingen rigtige billeder eller videoer endnu',
   },
+
+  // Samme syv statusser overalt.
+  status: {
+    draft: 'Kladde',
+    generating: 'Genererer',
+    needs_approval: 'Venter på dig',
+    approved: 'Godkendt',
+    rejected: 'Afvist',
+    outdated: 'Forældet',
+    failed: 'Fejlet',
+  } as Record<string, string>,
+
+  shotTypes: {
+    extreme_wide: 'Ekstrem total', wide: 'Total', medium: 'Halvtotal', medium_closeup: 'Halvnær',
+    close_up: 'Nær', extreme_close_up: 'Ultranær', over_the_shoulder: 'Over skulderen', pov: 'Point of view', insert: 'Insert',
+  } as Record<string, string>,
+  movements: {
+    static: 'Statisk', pan: 'Panorering', tilt: 'Tilt', handheld: 'Håndholdt', dolly: 'Dolly', optical_zoom: 'Optisk zoom',
+  } as Record<string, string>,
+  kinds: { character: 'Karakter', location: 'Location', vehicle: 'Køretøj', prop: 'Prop' } as Record<string, string>,
   tagline: 'Fra idé til storyboard — du godkender hvert trin.',
 
   auth: {
@@ -104,17 +130,6 @@ export const texts = {
     approved: 'Storyboardet er godkendt. Næste trin — karakterer og referencebilleder — kommer i bid 2.',
   },
 
-  shotTypes: {
-    extreme_wide: 'Ekstrem total',
-    wide: 'Total',
-    medium: 'Halvtotal',
-    close_up: 'Nær',
-    extreme_close_up: 'Ultranær',
-    over_the_shoulder: 'Over skulderen',
-    pov: 'Point of view',
-    insert: 'Insert',
-  } as Record<string, string>,
-
   errors: {
     network: 'Ingen forbindelse. Tjek dit netværk, og prøv igen.',
     invalidInput: 'Nogle af felterne er ikke udfyldt korrekt. Tjek dem, og prøv igen.',
@@ -130,6 +145,10 @@ export const texts = {
     refusal: 'Instruktøren kunne ikke arbejde med den idé. Omformulér den, og prøv igen.',
     generationRetry: 'Instruktøren gik i stå undervejs. Prøv igen.',
     generationPermanent: 'Det kunne ikke lade sig gøre lige nu. Kontakt support, hvis det bliver ved.',
+    notReady: 'Noget er ændret, siden du så planen. Opdatér, og prøv igen.',
+    priceChanged: 'Prisen er ændret, siden du så den. Se den nye pris, og godkend igen.',
+    overBudget: 'Det overskrider filmens budget. Fravælg noget, eller hæv budgettet.',
+    locked: 'Den version er godkendt og låst. Lav en ny version for at ændre den.',
     server: 'Noget gik galt hos os. Prøv igen om lidt.',
     unknown: 'Noget gik galt. Prøv igen.',
   },
