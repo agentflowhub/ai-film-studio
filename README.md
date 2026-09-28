@@ -1,7 +1,7 @@
-# [PRODUCT NAME]
+# FRAME
 
-> Produktnavnet er ikke besluttet. `[PRODUCT NAME]` er en placeholder, som
-> står ét sted: `product.config.json`.
+> Brandet er FRAME. Navnet står ét sted: `product.config.json` — app,
+> prototype og sidetitel henter det derfra.
 
 Et AI-produktionssystem, hvor brugeren instruerer filmen på et menneskeligt niveau, mens systemet håndterer AI-generation, kontinuitet, referencesystem, prompts, modeller, approvals og produktionsstatus.
 
@@ -69,8 +69,9 @@ npm run dev
 
 ## MVP 1 — status
 
-Backend for hele produktionskæden er bygget (migration 002–003 og Edge
-Functions); brugerfladen er næste skridt.
+Hele produktionskæden er bygget: database (migration 002–003), Edge
+Functions, brugerfladen (mørkt studie-look) og de rigtige providere. Intet
+er endnu kørt mod et rigtigt Supabase-projekt eller rigtige API-nøgler.
 
 | Edge Function | Hvad den gør |
 |---|---|
@@ -87,11 +88,27 @@ Functions); brugerfladen er næste skridt.
 | `generation-worker` | Kører køen: submit, følg, failover, gem resultat, bogfør pris |
 | `generation-review` | Godkend/afvis et resultat (startframe, video, master-referencer) |
 
-**Providere:** indtil de rigtige billed- og videoprovidere er valgt, kører
-produktionen mod en simulator bag samme interface
-(`ALLOW_SIMULATOR_PROVIDER=true`). Den kan aldrig bruges, når
-`APP_ENV=production`, og dens resultater gemmes som tydeligt mærkede
-pladsholdere.
+**Providere** (`supabase/functions/_shared/providers/`):
+
+| Provider | Bruges til | Hemmelighed | Modeller |
+|---|---|---|---|
+| OpenAI — ChatGPT Images | Referencebilleder og startframes | `OPENAI_API_KEY` | `gpt-image-2.5-sunburst` (præcis), `gpt-image-2.5-flare` (hurtig, reserve) |
+| Higgsfield | Video fra den godkendte startframe | `HIGGSFIELD_CREDENTIALS` (`KEY_ID:KEY_SECRET`) | DoP `dop-standard`, `dop-turbo` (reserve) |
+
+- En provider er kun aktiv, når dens hemmelighed er sat. Modeller, evner og
+  priser står i `catalog.ts`; priser (øre pr. generering, grundlaget for
+  budgetreservationen) kan rettes pr. model med `FILM_PRICE_<PROVIDER>_<MODEL>`.
+  **Standardpriserne er anslåede og skal afstemmes med de faktiske priser.**
+- OpenAI kaldes via Responses-API'et i baggrundstilstand med billedværktøjet,
+  så et billede kan følges og stoppes som et job i stedet for at holde en
+  Edge Function åben i minutter.
+- Higgsfield kan kun stoppe et job, mens det står i kø. Et job i gang kan ikke
+  stoppes, så en tidsudløbet video skifter aldrig til reserven (det kunne give
+  to betalte jobs); genereringen fejler i stedet, og et menneske tager stilling.
+- Reserven kan være en anden model hos samme provider. Et nyt forsøg kræver
+  stadig, at det forrige er bekræftet stoppet (databasens `attempt_failover_guard`).
+- Simulatoren (`ALLOW_SIMULATOR_PROVIDER=true`) findes fortsat til udvikling og
+  test. Den kan aldrig bruges, når `APP_ENV=production`.
 
 **Worker:** `generation-worker` skal kaldes hvert minut af pg_cron (via
 pg_net) med headeren `x-worker-secret: $WORKER_SECRET`. Opsætningen er

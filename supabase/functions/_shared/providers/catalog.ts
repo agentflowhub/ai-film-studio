@@ -1,0 +1,76 @@
+// Konfiguration af de rigtige billed- og videomodeller: hvilke modeller der
+// findes, hvad de kan, og hvad de koster. Adapterne (openai-images.ts,
+// higgsfield.ts) kender kun API'et — hvilken model der bruges, står her.
+//
+// PRISER: priceCents er FRAMEs anslåede pris i øre pr. generering og er
+// grundlaget for budgetreservationen. De skal afstemmes med de faktiske
+// priser hos OpenAI og Higgsfield og kan overskrives uden ny kode med en
+// miljøvariabel pr. model, fx FILM_PRICE_OPENAI_GPT_IMAGE_2_5_SUNBURST=350.
+
+import type { ModelInfo } from './types.ts';
+
+export const ALL_MOVEMENTS = ['static', 'pan', 'tilt', 'handheld', 'dolly', 'optical_zoom'];
+
+export const OPENAI_MODELS: ModelInfo[] = [
+  {
+    provider: 'openai', model: 'gpt-image-2.5-sunburst', label: 'ChatGPT Images 2.5 (præcis)',
+    capabilities: ['text_to_image', 'image_to_image'], maxReferenceImages: 16, priceCents: 300, quality: 3,
+  },
+  {
+    provider: 'openai', model: 'gpt-image-2.5-flare', label: 'ChatGPT Images 2.5 (hurtig)',
+    capabilities: ['text_to_image', 'image_to_image'], maxReferenceImages: 16, priceCents: 150, quality: 2,
+  },
+];
+
+// Higgsfield DoP: image-to-video fra én startframe. Kamerabevægelsen beskrives
+// i prompten. Klippets længde bestemmes af modellen; sæt min/max her, når de
+// er bekræftet, så routeren kan fravælge shots, der ikke passer.
+export const HIGGSFIELD_MODELS: ModelInfo[] = [
+  {
+    provider: 'higgsfield', model: 'dop-standard', label: 'Higgsfield DoP (standard)',
+    capabilities: ['image_to_video'], maxReferenceImages: 1, movements: ALL_MOVEMENTS, priceCents: 600, quality: 3,
+  },
+  {
+    provider: 'higgsfield', model: 'dop-turbo', label: 'Higgsfield DoP (turbo)',
+    capabilities: ['image_to_video'], maxReferenceImages: 1, movements: ALL_MOVEMENTS, priceCents: 400, quality: 2,
+  },
+];
+
+export interface ProviderSettings {
+  openai: {
+    // Modellen, der styrer Responses-kaldet og kalder billedværktøjet. Selve
+    // billedet laves af billedmodellen ovenfor.
+    responsesModel: string;
+    size: string;
+    quality: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto';
+  };
+  higgsfield: { endpoint: string };
+}
+
+const SETTINGS: ProviderSettings = {
+  openai: { responsesModel: 'gpt-5.4-mini', size: '1536x864', quality: 'high' },
+  higgsfield: { endpoint: '/v1/image2video/dop' },
+};
+
+export function providerSettings(getEnv: (key: string) => string | undefined): ProviderSettings {
+  return {
+    openai: {
+      ...SETTINGS.openai,
+      responsesModel: getEnv('FILM_OPENAI_RESPONSES_MODEL')?.trim() || SETTINGS.openai.responsesModel,
+    },
+    higgsfield: SETTINGS.higgsfield,
+  };
+}
+
+export function priceEnvKey(m: Pick<ModelInfo, 'provider' | 'model'>): string {
+  return `FILM_PRICE_${m.provider}_${m.model}`.replace(/[^a-z0-9]/gi, '_').toUpperCase();
+}
+
+// Priser kan rettes pr. model uden en ny deploy. Ugyldige værdier ignoreres.
+export function withPrices(models: ModelInfo[], getEnv: (key: string) => string | undefined): ModelInfo[] {
+  return models.map((m) => {
+    const raw = getEnv(priceEnvKey(m))?.trim();
+    const n = raw ? Number(raw) : NaN;
+    return Number.isInteger(n) && n > 0 ? { ...m, priceCents: n } : m;
+  });
+}

@@ -13,7 +13,7 @@ export const texts = {
     save: 'Gem',
     open: 'Åbn',
     loading: 'Henter …',
-    simulated: 'Simuleret provider — ingen rigtige billeder eller videoer endnu',
+    simulated: 'Simulatoren er slået til — resultater fra den er pladsholdere, ikke rigtige billeder eller videoer',
   },
 
   // Samme syv statusser overalt.

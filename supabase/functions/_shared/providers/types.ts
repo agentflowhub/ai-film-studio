@@ -31,6 +31,16 @@ export type ProviderStatus =
   | { state: 'succeeded'; files: { url: string; mime: string }[] }
   | { state: 'failed'; retryable: boolean; reason: string };
 
+// Et kald, provideren afviste, før noget job blev oprettet (fx 400/401/422):
+// der er intet at stoppe. Andre fejl ved oprettelsen (netværk, 5xx) kan have
+// oprettet et job, vi ikke kender id'et på — dem behandles som ubekræftede.
+export class ProviderRejectedError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = 'ProviderRejectedError';
+  }
+}
+
 export interface ProviderAdapter {
   id: string;
   models(): ModelInfo[];

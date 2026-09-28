@@ -8,16 +8,17 @@
 //      reserven prøves (databasen tillader ikke et nyt forsøg før). Anden fejl
 //      → genereringen fejler, og reservationen frigives.
 //
-// Idempotens: job-id'et fra provideren skrives på forsøget, FØR noget andet;
-// samme generering+forsøg sender samme idempotency-nøgle til provideren.
+// Idempotens: job-id'et fra provideren skrives på forsøget, FØR noget andet.
+// Et forsøg oprettes kun én gang (databasen tillader ét aktivt forsøg pr.
+// generering), og et nyt forsøg kræver, at det forrige er bekræftet stoppet.
 
 import { adminClient, type Admin } from '../_shared/db.ts';
 import { corsHeaders, json, log } from '../_shared/http.ts';
 import { sha256Bytes } from '../_shared/prompt.ts';
-import { decideAfterPoll } from '../_shared/production.ts';
+import { decideAfterPoll, MAX_ATTEMPTS_PER_GENERATION } from '../_shared/production.ts';
 import { createRegistry, type Registry } from '../_shared/providers/registry.ts';
 import { simulatedFile } from '../_shared/providers/simulator.ts';
-import type { GenerationRequest } from '../_shared/providers/types.ts';
+import { ProviderRejectedError, type GenerationRequest } from '../_shared/providers/types.ts';
 
 const BATCH = 20;
 const MAX_FILE_BYTES = 300 * 1024 * 1024;
@@ -79,6 +80,21 @@ async function buildRequest(admin: Admin, g: Gen): Promise<GenerationRequest> {
   return req;
 }
 
+// Reserven, hvis den ikke allerede er prøvet (samme model to gange giver ingen mening).
+async function untriedFallback(admin: Admin, g: Gen): Promise<{ provider: string; model: string } | null> {
+  const fb = g.input.fallback;
+  if (!fb) return null;
+  const tried = await admin.from('generation_attempts').select('provider, model').eq('generation_id', g.id);
+  if (tried.error) throw tried.error;
+  return tried.data.some((t) => t.provider === fb.provider && t.model === fb.model) ? null : fb;
+}
+
+async function failGeneration(admin: Admin, g: Gen, reason: string, stopConfirmed: boolean): Promise<void> {
+  await admin.from('generations').update({ status: 'failed' }).eq('id', g.id);
+  await admin.rpc('release_budget', { target_project: g.project_id, cents: g.cost_estimate_cents });
+  log('error', 'generation.failed', { generation_id: g.id, reason, stop_confirmed: stopConfirmed });
+}
+
 async function submitAttempt(admin: Admin, registry: Registry, g: Gen, attemptNo: number, target: { provider: string; model: string }): Promise<void> {
   const ins = await admin
     .from('generation_attempts')
@@ -87,12 +103,33 @@ async function submitAttempt(admin: Admin, registry: Registry, g: Gen, attemptNo
     .single();
   if (ins.error) throw ins.error;
   const adapter = registry.adapter(target.provider);
+  let providerJobId: string | null = null;
+  let failure: { reason: string; confirmed: boolean } | null = null;
   if (!adapter) {
     // Provideren findes ikke (længere): intet job er oprettet, så intet skal stoppes.
-    await admin.from('generation_attempts').update({ status: 'failed', stop_confirmed: true, error: { reason: 'provideren er ikke tilgængelig' }, finished_at: new Date().toISOString() }).eq('id', ins.data.id);
-    return;
+    failure = { reason: 'provideren er ikke tilgængelig', confirmed: true };
+  } else {
+    try {
+      ({ providerJobId } = await adapter.submit(target.model, await buildRequest(admin, g), `${g.id}:${attemptNo}`));
+    } catch (err) {
+      // Afvist før oprettelse = intet job. Alt andet kan have oprettet et job,
+      // vi ikke kender — så er stoppet ikke bekræftet, og reserven prøves ikke.
+      const rejected = err instanceof ProviderRejectedError;
+      failure = { reason: rejected ? err.message : 'provideren svarede ikke ved oprettelsen', confirmed: rejected };
+      log('warn', 'generation.submit_failed', { generation_id: g.id, attempt: attemptNo, provider: target.provider, message: err instanceof Error ? err.message : String(err) });
+    }
   }
-  const { providerJobId } = await adapter.submit(target.model, await buildRequest(admin, g), `${g.id}:${attemptNo}`);
+  if (failure) {
+    await admin.from('generation_attempts').update({
+      status: 'failed', stop_confirmed: failure.confirmed, error: { reason: failure.reason }, finished_at: new Date().toISOString(),
+    }).eq('id', ins.data.id);
+    const fallback = failure.confirmed && attemptNo < MAX_ATTEMPTS_PER_GENERATION ? await untriedFallback(admin, g) : null;
+    if (fallback) {
+      log('warn', 'generation.failover', { generation_id: g.id, from: target.provider, to: fallback.provider, reason: failure.reason });
+      return submitAttempt(admin, registry, g, attemptNo + 1, fallback);
+    }
+    return failGeneration(admin, g, failure.reason, failure.confirmed);
+  }
   const upd = await admin
     .from('generation_attempts')
     .update({ provider_job_id: providerJobId, status: 'submitted', started_at: new Date().toISOString() })
@@ -114,7 +151,7 @@ async function storeResult(admin: Admin, g: Gen, file: { url: string; mime: stri
     bytes = new Uint8Array(await res.arrayBuffer());
     if (bytes.byteLength > MAX_FILE_BYTES) throw new Error('resultatet er for stort');
   }
-  const ext = mime === 'video/mp4' ? 'mp4' : mime === 'image/svg+xml' ? 'svg' : mime === 'image/jpeg' ? 'jpg' : 'png';
+  const ext = mime === 'video/mp4' ? 'mp4' : mime === 'image/svg+xml' ? 'svg' : mime === 'image/jpeg' ? 'jpg' : mime === 'image/webp' ? 'webp' : 'png';
   const path = `${g.org_id}/${g.project_id}/${g.id}.${ext}`;
   const up = await admin.storage.from('media').upload(path, bytes, { contentType: mime, upsert: true });
   if (up.error) throw up.error;
@@ -165,8 +202,7 @@ async function pollActive(admin: Admin, registry: Registry): Promise<number> {
     const status = adapter && a.provider_job_id
       ? await adapter.status(a.provider_job_id)
       : { state: 'failed' as const, retryable: true, reason: 'provideren er ikke tilgængelig' };
-    const tried = await admin.from('generation_attempts').select('provider').eq('generation_id', g.id);
-    const fallback = g.input.fallback && !(tried.data ?? []).some((t) => t.provider === g.input.fallback!.provider) ? g.input.fallback : null;
+    const fallback = await untriedFallback(admin, g);
     const decision = decideAfterPoll(status, {
       elapsedMs: a.started_at ? Date.now() - Date.parse(a.started_at) : 0,
       attempts: a.attempt,
@@ -202,9 +238,7 @@ async function pollActive(admin: Admin, registry: Registry): Promise<number> {
       await submitAttempt(admin, registry, g, a.attempt + 1, fallback);
       continue;
     }
-    await admin.from('generations').update({ status: 'failed' }).eq('id', g.id);
-    await admin.rpc('release_budget', { target_project: g.project_id, cents: g.cost_estimate_cents });
-    log('error', 'generation.failed', { generation_id: g.id, reason: decision.reason, stop_confirmed: confirmed });
+    await failGeneration(admin, g, decision.reason, confirmed);
   }
   return n;
 }
