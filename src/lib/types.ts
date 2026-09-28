@@ -6,7 +6,7 @@ import type { BriefAnswers, FilmBrief, StoryboardDraft } from '../../supabase/fu
 export type { BriefAnswers, FilmBrief, StoryboardDraft };
 export { FILM_STYLES, MAX_FILM_SECONDS, MIN_FILM_SECONDS } from '../../supabase/functions/_shared/constants.ts';
 
-export type Stage = 'briefing' | 'storyboarding' | 'storyboard_ready';
+export type Stage = 'briefing' | 'storyboarding' | 'production';
 export type OutputStatus = 'pending_approval' | 'approved' | 'rejected';
 
 export interface Project {

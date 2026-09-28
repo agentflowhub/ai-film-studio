@@ -18,7 +18,11 @@ afterAll(async () => {
   await db?.drop();
 });
 
-const TABLES = ['orgs', 'org_members', 'projects', 'tasks', 'approvals', 'film_briefs', 'storyboards', 'shots', 'usage'];
+const TABLES = [
+  'orgs', 'org_members', 'projects', 'tasks', 'approvals', 'film_briefs', 'storyboards', 'shots', 'usage',
+  'film_versions', 'project_budgets', 'film_dna', 'film_rules', 'media', 'assets', 'asset_versions',
+  'asset_references', 'shot_assets', 'shot_deviations', 'shot_fix_log', 'generations', 'generation_attempts',
+];
 
 describe('RLS', () => {
   it('har RLS slået til og org_id på alle tabeller i public', async () => {
@@ -81,7 +85,7 @@ describe('RLS', () => {
     ).rejects.toThrow(/permission denied/);
   });
 
-  it.each(['tasks', 'film_briefs', 'storyboards', 'shots', 'usage'])(
+  it.each(['tasks', 'film_briefs', 'storyboards', 'shots', 'usage', 'assets', 'asset_versions', 'generations', 'generation_attempts', 'film_dna', 'film_rules', 'project_budgets'])(
     'en bruger kan ikke indsætte direkte i %s',
     async (table) => {
       await expect(

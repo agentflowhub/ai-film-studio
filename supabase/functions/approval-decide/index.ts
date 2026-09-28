@@ -12,15 +12,15 @@ import { evaluateDecision, type TaskType } from '../_shared/policy.ts';
 import { serve } from '../_shared/runtime.ts';
 import { ApprovalDecideRequestSchema } from '../_shared/schemas.ts';
 
-const OUTPUT_TABLE: Record<TaskType, 'film_briefs' | 'storyboards'> = {
+const OUTPUT_TABLE: Partial<Record<TaskType, 'film_briefs' | 'storyboards'>> = {
   'brief.generate': 'film_briefs',
   'storyboard.generate': 'storyboards',
 };
 
 // Hvilket trin projektet går videre til, når output af denne type godkendes.
-const STAGE_AFTER_APPROVAL: Record<TaskType, { from: string; to: string }> = {
+const STAGE_AFTER_APPROVAL: Partial<Record<TaskType, { from: string; to: string }>> = {
   'brief.generate': { from: 'briefing', to: 'storyboarding' },
-  'storyboard.generate': { from: 'storyboarding', to: 'storyboard_ready' },
+  'storyboard.generate': { from: 'storyboarding', to: 'production' },
 };
 
 async function applyDecision(
@@ -28,8 +28,10 @@ async function applyDecision(
   task: { id: string; type: TaskType; project_id: string },
   decision: 'approved' | 'rejected',
 ): Promise<void> {
+  const table = OUTPUT_TABLE[task.type];
+  if (!table) throw new Error(`approval-decide kender ikke opgavetypen ${task.type}`);
   const output = await admin
-    .from(OUTPUT_TABLE[task.type])
+    .from(table)
     .update({ status: decision })
     .eq('task_id', task.id)
     .eq('status', 'pending_approval');
@@ -44,6 +46,7 @@ async function applyDecision(
 
   if (decision === 'approved') {
     const stage = STAGE_AFTER_APPROVAL[task.type];
+    if (!stage) return;
     const project = await admin
       .from('projects')
       .update({ stage: stage.to })

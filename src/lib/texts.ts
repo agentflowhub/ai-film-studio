@@ -38,7 +38,7 @@ export const texts = {
   stages: {
     briefing: 'Brief',
     storyboarding: 'Storyboard',
-    storyboard_ready: 'Storyboard godkendt',
+    production: 'Produktion',
   } as Record<string, string>,
 
   interview: {
