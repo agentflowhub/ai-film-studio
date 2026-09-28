@@ -6,17 +6,21 @@ function shot(duration: number) {
   return {
     duration_seconds: duration,
     shot_type: 'medium' as const,
+    lens_mm: 35,
+    movement: 'handheld' as const,
     camera: 'Håndholdt, 35 mm',
     action: 'Sander kigger på sin telefon',
     dialogue: null,
-    characters: ['Sander'],
-    location: 'Køkken',
-    props: ['Telefon'],
+    performance: null,
+    lighting: null,
+    audio: null,
+    asset_keys: ['hovedperson', 'koekken', 'hovedperson'],
   };
 }
 
 function draft(...scenes: number[][]): StoryboardDraft {
   return {
+    assets: [{ key: 'hovedperson', kind: 'character' as const, name: 'Sander', role: 'Testkarakter', attributes: [{ name: 'Hår', value: 'gråt' }] }],
     scenes: scenes.map((durations, i) => ({
       heading: `Scene ${i + 1}`,
       purpose: 'Etablerer Sander',
@@ -78,6 +82,12 @@ describe('flattenShots', () => {
       [1, 2],
       [2, 1],
     ]);
+  });
+
+  it('giver fortløbende shot-koder og fjerner dublerede aktiv-nøgler', () => {
+    const flat = flattenShots(draft([2, 3], [4]));
+    expect(flat.map((s) => s.code)).toEqual(['SHOT_01', 'SHOT_02', 'SHOT_03']);
+    expect(flat[0]!.asset_keys).toEqual(['hovedperson', 'koekken']);
   });
 
   it('gemmer en tom replik som null', () => {

@@ -12,16 +12,20 @@ export const MIN_SHOT_SECONDS = 1;
 export const MAX_SCALE_DEVIATION = 0.5;
 
 export interface FlatShot {
+  code: string;
   scene_number: number;
   shot_number: number;
   duration_seconds: number;
   shot_type: string;
+  lens_mm: number | null;
+  movement: string;
   camera: string;
   action: string;
   dialogue: string | null;
-  characters: string[];
-  location: string;
-  props: string[];
+  performance: string | null;
+  lighting: string | null;
+  audio: string | null;
+  asset_keys: string[];
 }
 
 export function totalSeconds(draft: StoryboardDraft): number {
@@ -63,7 +67,7 @@ export function fitToDuration(draft: StoryboardDraft, targetSeconds: number): Fi
 
   // Afrunding kan efterlade en rest; læg den på det længste shot, så summen
   // rammer målet præcist.
-  const scaled: StoryboardDraft = { scenes };
+  const scaled: StoryboardDraft = { ...draft, scenes };
   const diff = roundHalf(targetSeconds - totalSeconds(scaled));
   if (diff !== 0) {
     let best: { si: number; hi: number; d: number } | null = null;
@@ -83,18 +87,23 @@ export function fitToDuration(draft: StoryboardDraft, targetSeconds: number): Fi
 }
 
 export function flattenShots(draft: StoryboardDraft): FlatShot[] {
+  let n = 0;
   return draft.scenes.flatMap((scene, sceneIndex) =>
     scene.shots.map((shot, shotIndex) => ({
+      code: 'SHOT_' + String(++n).padStart(2, '0'),
       scene_number: sceneIndex + 1,
       shot_number: shotIndex + 1,
       duration_seconds: shot.duration_seconds,
       shot_type: shot.shot_type,
+      lens_mm: shot.lens_mm,
+      movement: shot.movement,
       camera: shot.camera,
       action: shot.action,
       dialogue: shot.dialogue && shot.dialogue.trim() ? shot.dialogue : null,
-      characters: shot.characters,
-      location: shot.location,
-      props: shot.props,
+      performance: shot.performance,
+      lighting: shot.lighting,
+      audio: shot.audio,
+      asset_keys: [...new Set(shot.asset_keys)],
     })),
   );
 }

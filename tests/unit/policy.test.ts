@@ -24,13 +24,15 @@ describe('godkendelse før storyboard', () => {
     expect(canGenerateStoryboard(brief, approval)).toEqual({ ok: false, code: 'brief_not_approved' });
   });
 
-  it('kræver godkendelse af output for alle opgavetyper i bid 1', () => {
+  it('kræver godkendelse af output for alle opgavetyper', () => {
     for (const type of TASK_TYPES) expect(outputRequiresApproval(type)).toBe(true);
   });
 
-  it('har ingen betalte opgavetyper endnu, men kræver ja før enhver på listen', () => {
-    expect(COST_BEARING_TASK_TYPES).toEqual([]);
+  it('kræver ja før alle betalte generationer — og kun dem', () => {
+    expect([...COST_BEARING_TASK_TYPES].sort()).toEqual(['asset.master_generate', 'frame.generate', 'video.generate']);
+    for (const t of COST_BEARING_TASK_TYPES) expect(requiresApprovalBeforeExecution(t)).toBe(true);
     expect(requiresApprovalBeforeExecution('brief.generate')).toBe(false);
+    expect(requiresApprovalBeforeExecution('storyboard.generate')).toBe(false);
   });
 });
 

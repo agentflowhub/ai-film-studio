@@ -24,6 +24,7 @@ export const BriefAnswersSchema = z.object({
   duration_seconds: z.number().int().min(MIN_FILM_SECONDS).max(MAX_FILM_SECONDS),
   style: z.enum(FILM_STYLES),
   style_notes: z.string().trim().max(1000).optional(),
+  shot_count: z.number().int().min(3).max(24).optional(),
 });
 export type BriefAnswers = z.infer<typeof BriefAnswersSchema>;
 
@@ -55,13 +56,55 @@ export const FilmBriefSchema = z.object({
 export type FilmBrief = z.infer<typeof FilmBriefSchema>;
 
 // ---------------------------------------------------------------------------
-// Storyboard (Claudes output)
+// Film DNA og filmregler (Claudes forslag sammen med briefet)
+// ---------------------------------------------------------------------------
+
+export const DNA_FIELDS = ['Genre', 'Visuelt sprog', 'Kamera', 'Lys', 'Spil', 'Farver', 'Tekstur', 'Klipning'] as const;
+
+export const FilmDnaSchema = z.object({
+  genre: z.string().min(1).max(200),
+  visual_language: z.string().min(1).max(300),
+  camera: z.string().min(1).max(300),
+  lighting: z.string().min(1).max(300),
+  performance: z.string().min(1).max(300),
+  colour: z.string().min(1).max(300),
+  texture: z.string().min(1).max(300),
+  editing: z.string().min(1).max(300),
+});
+export type FilmDna = z.infer<typeof FilmDnaSchema>;
+
+// Film DNA gemmes med danske feltnavne, fordi de vises og bruges ordret i prompts.
+export function dnaFields(d: FilmDna): Record<(typeof DNA_FIELDS)[number], string> {
+  return {
+    'Genre': d.genre, 'Visuelt sprog': d.visual_language, 'Kamera': d.camera, 'Lys': d.lighting,
+    'Spil': d.performance, 'Farver': d.colour, 'Tekstur': d.texture, 'Klipning': d.editing,
+  };
+}
+
+export const FilmRuleDraftSchema = z.object({
+  text: z.string().min(1).max(200),
+  reason: z.string().min(1).max(300),
+  // Ord, der i et shot betyder, at reglen er brudt. Tom liste = kun i prompten.
+  trigger_words: z.array(z.string().min(2).max(40)).max(8),
+});
+export type FilmRuleDraft = z.infer<typeof FilmRuleDraftSchema>;
+
+export const BriefPackageSchema = z.object({
+  brief: FilmBriefSchema,
+  film_dna: FilmDnaSchema,
+  film_rules: z.array(FilmRuleDraftSchema).max(12),
+});
+export type BriefPackage = z.infer<typeof BriefPackageSchema>;
+
+// ---------------------------------------------------------------------------
+// Storyboard (Claudes output) — shots peger på aktiver, ikke fritekst
 // ---------------------------------------------------------------------------
 
 export const SHOT_TYPES = [
   'extreme_wide',
   'wide',
   'medium',
+  'medium_closeup',
   'close_up',
   'extreme_close_up',
   'over_the_shoulder',
@@ -69,15 +112,32 @@ export const SHOT_TYPES = [
   'insert',
 ] as const;
 
+export const MOVEMENTS = ['static', 'pan', 'tilt', 'handheld', 'dolly', 'optical_zoom'] as const;
+export const ASSET_KINDS = ['character', 'location', 'vehicle', 'prop'] as const;
+
+export const AssetDraftSchema = z.object({
+  // Nøgle, som shots bruger til at pege på aktivet, fx "hovedperson" eller "koekken".
+  key: z.string().regex(/^[a-z][a-z0-9_]{1,39}$/),
+  kind: z.enum(ASSET_KINDS),
+  name: z.string().min(1).max(120),
+  role: z.string().min(1).max(200),
+  // Liste frem for et frit objekt, så skemaet virker som structured output.
+  attributes: z.array(z.object({ name: z.string().min(1).max(40), value: z.string().min(1).max(200) })).min(1).max(12),
+});
+export type AssetDraft = z.infer<typeof AssetDraftSchema>;
+
 export const ShotDraftSchema = z.object({
   duration_seconds: z.number(),
   shot_type: z.enum(SHOT_TYPES),
+  lens_mm: z.number().int().nullable(),
+  movement: z.enum(MOVEMENTS),
   camera: z.string().min(1).max(300),
   action: z.string().min(1).max(800),
   dialogue: z.string().max(800).nullable(),
-  characters: z.array(z.string().min(1).max(80)).max(8),
-  location: z.string().min(1).max(200),
-  props: z.array(z.string().min(1).max(120)).max(12),
+  performance: z.string().max(80).nullable(),
+  lighting: z.string().max(200).nullable(),
+  audio: z.string().max(200).nullable(),
+  asset_keys: z.array(z.string()).min(1).max(10),
 });
 export type ShotDraft = z.infer<typeof ShotDraftSchema>;
 
@@ -89,9 +149,16 @@ export const SceneDraftSchema = z.object({
 export type SceneDraft = z.infer<typeof SceneDraftSchema>;
 
 export const StoryboardDraftSchema = z.object({
+  assets: z.array(AssetDraftSchema).min(1).max(30),
   scenes: z.array(SceneDraftSchema).min(1).max(30),
 });
 export type StoryboardDraft = z.infer<typeof StoryboardDraftSchema>;
+
+// Hvert shot må kun pege på aktiver, der findes i storyboardets aktivliste.
+export function unknownAssetKeys(draft: StoryboardDraft): string[] {
+  const keys = new Set(draft.assets.map((a) => a.key));
+  return [...new Set(draft.scenes.flatMap((s) => s.shots.flatMap((shot) => shot.asset_keys)).filter((k) => !keys.has(k)))];
+}
 
 // ---------------------------------------------------------------------------
 // Request-skemaer for Edge Functions

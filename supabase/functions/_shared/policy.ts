@@ -3,14 +3,22 @@
 // (001_kerne_brief_storyboard.sql) håndhæver de samme regler en gang til, så
 // en fejl i koden ikke kan springe godkendelsen over.
 
-export const TASK_TYPES = ['brief.generate', 'storyboard.generate'] as const;
+export const TASK_TYPES = [
+  'brief.generate',
+  'dna.generate',
+  'storyboard.generate',
+  'asset.master_generate',
+  'frame.generate',
+  'video.generate',
+  'production.batch',
+] as const;
 export type TaskType = (typeof TASK_TYPES)[number];
 
 // Opgavetyper, der bruger betalte kreditter hos en ekstern billed- eller
-// videoleverandør. De kræver ALTID et ja, før de kører — uanset hvor mange
-// gange samme type er godkendt før. Tom i bid 1 (kun Claude-tekst);
-// 'image.generate' og 'video.generate' kommer på listen i bid 2–4.
-export const COST_BEARING_TASK_TYPES: readonly string[] = [];
+// videoleverandør. De kræver ALTID et ja (på opgaven eller dens batch), før de
+// kører — uanset hvor mange gange samme type er godkendt før. Databasen
+// håndhæver det samme (generation_gate i 002_produktion.sql).
+export const COST_BEARING_TASK_TYPES: readonly string[] = ['asset.master_generate', 'frame.generate', 'video.generate'];
 
 export function requiresApprovalBeforeExecution(taskType: string): boolean {
   return COST_BEARING_TASK_TYPES.includes(taskType);
