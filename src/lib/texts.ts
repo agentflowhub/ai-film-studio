@@ -1,7 +1,9 @@
 // Alle brugertekster samlet ét sted (klar til i18n senere).
 
+import { PRODUCT_NAME } from './product.ts';
+
 export const texts = {
-  appName: 'AI Film Studio',
+  appName: PRODUCT_NAME,
 
   common: {
     cancel: 'Fortryd',

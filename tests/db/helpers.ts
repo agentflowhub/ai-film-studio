@@ -87,7 +87,7 @@ export async function seedOrgWithPendingBrief(db: TestDb) {
   });
   const projectId = await as(db, user(ownerId), async (c) => {
     const res = await c.query<{ id: string }>(
-      `insert into public.projects(org_id, title, idea, created_by) values ($1, 'Sander', 'En film om Sander', $2) returning id`,
+      `insert into public.projects(org_id, title, idea, created_by) values ($1, 'Testfilm', 'En film til test', $2) returning id`,
       [orgId, ownerId],
     );
     return res.rows[0]!.id;

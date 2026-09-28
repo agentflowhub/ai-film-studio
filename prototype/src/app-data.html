@@ -1,0 +1,377 @@
+
+<div id="root"></div>
+
+<script>
+'use strict';
+
+/* =====================================================================
+   Statusser og ordforråd
+   ===================================================================== */
+const ST = {
+  draft: 'Kladde',
+  generating: 'Genererer',
+  needs_approval: 'Venter på dig',
+  approved: 'Godkendt',
+  rejected: 'Afvist',
+  outdated: 'Forældet',
+  failed: 'Fejlet',
+};
+const STATUS_ORDER = ['draft', 'generating', 'needs_approval', 'approved', 'rejected', 'outdated', 'failed'];
+const SHOT_TYPES = { extreme_wide: 'Ekstrem total', wide: 'Total', medium: 'Halvtotal', medium_closeup: 'Halvnær', closeup: 'Nær', insert: 'Insert' };
+const MOVES = { static: 'Statisk', pan: 'Panorering', handheld: 'Håndholdt', dolly: 'Dolly', optical_zoom: 'Optisk zoom' };
+const PERFORMANCE = ['Underspillet', 'Naturligt', 'Træt', 'Energisk'];
+const KIND = {
+  character: { label: 'Karakter', plural: 'Karakterer', code: 'CHAR' },
+  location: { label: 'Location', plural: 'Locations', code: 'LOC' },
+  vehicle: { label: 'Køretøj', plural: 'Køretøjer', code: 'VEH' },
+  prop: { label: 'Prop', plural: 'Props', code: 'PROP' },
+};
+const REF_ROLES = {
+  character: [['face', 'Ansigt'], ['full_body', 'Helkrop'], ['profile', 'Profil'], ['clothing', 'Påklædning'], ['expression', 'Udtryk']],
+  location: [['establishing', 'Overblik'], ['detail', 'Detalje'], ['light', 'Lys og tid']],
+  vehicle: [['side', 'Side'], ['front', 'Front'], ['logo', 'Logo']],
+  prop: [['object', 'Genstand'], ['detail', 'Detalje']],
+};
+const MASTER_PRICE = 9;
+
+/* Providere: brugeren behøver ikke kende dem. Systemet anbefaler ud fra shottets behov. */
+const PROVIDERS = {
+  frame: [
+    { id: 'img_a', name: 'Billedmodel A', price: 7, note: 'op til 4 referencebilleder pr. karakter' },
+    { id: 'img_b', name: 'Billedmodel B', price: 6, note: 'hurtig og billig til locations og props' },
+  ],
+  video: [
+    { id: 'vid_a', name: 'Videomodel A', price: 28, min: 3, max: 10, moves: ['static', 'pan', 'handheld', 'dolly', 'optical_zoom'] },
+    { id: 'vid_b', name: 'Videomodel B', price: 22, min: 3, max: 8, moves: ['static', 'pan', 'handheld'] },
+  ],
+};
+
+/* =====================================================================
+   Film DNA og filmregler
+   ===================================================================== */
+const DNA_FIELDS = ['Genre', 'Visuelt sprog', 'Kamera', 'Lys', 'Spil', 'Farver', 'Tekstur', 'Klipning'];
+
+/* =====================================================================
+   Golden Test Case — indlejret af prototype/build.mjs fra
+   fixtures/golden-test-case/golden-test-case.json. Sander er testdata
+   (en fiktiv karakter), aldrig produktets navn.
+   ===================================================================== */
+const GOLDEN_DNA = GOLDEN.film_dna;
+const GOLDEN_RULES = GOLDEN.film_rules.map((r) => ({ ...r, on: true }));
+const GOLDEN_BRIEF = GOLDEN.brief;
+const GOLDEN_IDEA = GOLDEN.idea;
+function assetTemplates() {
+  return GOLDEN.assets.map((a) => ({ ...a, attrs: { ...a.attrs }, rules: a.rules.map((r) => ({ attr: r.attr, re: new RegExp(r.pattern, r.flags) })) }));
+}
+function shotTemplates() {
+  return GOLDEN.shots.map((t) => ({
+    id: 's_' + t.code.slice(5), code: t.code, scene: t.scene, duration: t.duration, camera: { ...t.camera },
+    action: t.action, dialogue: t.dialogue, notes: t.notes, lighting: t.lighting, performance: t.performance, audio: t.audio,
+    assets: t.assets.map((id) => ({ id, v: 1, pinned: false })),
+    frameReq: true, deviations: [], fixLog: [], choice: {}, frame: { versions: [], approved: null }, video: { versions: [], approved: null },
+  }));
+}
+const SCENES = GOLDEN.scenes;
+/* Rækkefølge instruktøren skærer ned efter, når filmen skal have færre shots. */
+const SHOT_PRIORITY = GOLDEN.cut_order;
+
+function storyboardFor(n, seconds) {
+  const all = shotTemplates();
+  const keep = new Set(SHOT_PRIORITY.slice(0, Math.max(4, Math.min(12, n))));
+  const picked = all.filter((s) => keep.has(s.code));
+  const sum = picked.reduce((a, s) => a + s.duration, 0);
+  let acc = 0;
+  picked.forEach((s, i) => {
+    s.duration = i === picked.length - 1 ? Math.max(2, seconds - acc) : Math.max(2, Math.round((s.duration / sum) * seconds));
+    acc += s.duration;
+    s.code = 'SHOT_' + String(i + 1).padStart(2, '0');
+    s.id = 's_' + String(i + 1).padStart(2, '0');
+  });
+  const shots = {}; for (const s of picked) shots[s.id] = s;
+  const scenes = SCENES.filter((sc) => picked.some((s) => s.scene === sc.id)).map((sc, i) => ({ ...sc, n: i + 1 }));
+  return { shots, scenes };
+}
+
+let uid = 100;
+const nextId = (p) => `${p}_${++uid}`;
+function mkVersion(n, status, extra = {}) { return { n, status, seed: n * 7 + Math.floor(Math.random() * 5), comment: '', provider: '', ...extra }; }
+
+function assetFromTemplate(t, status = 'draft') {
+  const roles = REF_ROLES[t.kind];
+  return {
+    id: t.id, code: t.code, kind: t.kind, name: t.name, role: t.role, look: t.look, rules: t.rules,
+    consent: t.kind === 'character' ? !!t.consent : null,
+    master: status === 'approved' ? 1 : null,
+    versions: [{ v: 1, status, attrs: { ...t.attrs }, note: '',
+      refs: status === 'draft' ? {} : Object.fromEntries(roles.slice(0, roles.length - (t.kind === 'character' ? 1 : 0)).map(([r]) => [r, { src: 'gen' }])) }],
+  };
+}
+
+function job(target, slot, provider, cost, status, attempts, at = 'i dag') {
+  return { id: nextId('job'), target, slot, provider, cost, status, at, attempts };
+}
+
+/* Golden Test Film midt i produktionen: viser alle statusser, konflikter og en failover. */
+function buildGoldenTestProject() {
+  const assets = {};
+  for (const t of assetTemplates()) assets[t.id] = assetFromTemplate(t, 'approved');
+  assets.a_per = assetFromTemplate(assetTemplates().find((t) => t.id === 'a_per'), 'draft');
+  const vl = assets.a_vanloc; vl.master = null; vl.versions[0].status = 'needs_approval';
+  const van = assets.a_van;
+  const vanV2 = GOLDEN.scenarios.find((x) => x.id === 'outdated-vehicle').new_version;
+  van.versions.push({ v: 2, status: 'approved', attrs: { ...van.versions[0].attrs, ...vanV2.attrs }, note: vanV2.note, refs: { side: { src: 'gen' }, front: { src: 'gen' }, logo: { src: 'gen' } } });
+  van.master = 2;
+
+  const shots = {};
+  for (const s of shotTemplates()) shots[s.id] = s;
+  shots.s_02.assets.find((a) => a.id === 'a_van').v = 2;
+  shots.s_04.assets.find((a) => a.id === 'a_van').v = 2;
+
+  const F = (s, list) => { s.frame.versions = list.map(([st, extra], i) => mkVersion(i + 1, st, { provider: 'Billedmodel A', ...(extra || {}) })); const ok = s.frame.versions.find((v) => v.status === 'approved'); s.frame.approved = ok ? ok.n : null; };
+  const V = (s, list) => { s.video.versions = list.map(([st, extra], i) => mkVersion(i + 1, st, { provider: 'Videomodel A', ...(extra || {}) })); const ok = s.video.versions.find((v) => v.status === 'approved'); s.video.approved = ok ? ok.n : null; };
+  F(shots.s_01, [['approved']]); V(shots.s_01, [['approved']]);
+  F(shots.s_02, [['rejected', { comment: 'Sander ser for ung ud.' }], ['approved']]); V(shots.s_02, [['needs_approval']]);
+  F(shots.s_03, [['approved']]); V(shots.s_03, [['failed', { provider: 'Videomodel B' }]]);
+  F(shots.s_04, [['approved']]); V(shots.s_04, [['generating', { provider: 'Videomodel B' }]]);
+  F(shots.s_05, [['needs_approval']]);
+  F(shots.s_06, [['generating']]);
+  F(shots.s_08, [['rejected', { comment: 'Sedlen skal være håndskrevet, ikke printet.' }]]);
+
+  const T = (id, slot, n) => ({ type: 'shot', id, n });
+  const ok = (provider) => [{ provider, status: 'done', note: 'leveret' }];
+  const jobs = [
+    job(T('s_01', 'frame', 1), 'frame', 'Billedmodel A', 7, 'done', ok('Billedmodel A'), 'i går'),
+    job(T('s_01', 'video', 1), 'video', 'Videomodel A', 28, 'done', ok('Videomodel A'), 'i går'),
+    job(T('s_02', 'frame', 1), 'frame', 'Billedmodel A', 7, 'done', ok('Billedmodel A'), 'i går'),
+    job(T('s_02', 'frame', 2), 'frame', 'Billedmodel A', 7, 'done', ok('Billedmodel A'), 'i går'),
+    job(T('s_03', 'frame', 1), 'frame', 'Billedmodel B', 6, 'done', ok('Billedmodel B'), 'i går'),
+    job(T('s_04', 'frame', 1), 'frame', 'Billedmodel A', 7, 'done', ok('Billedmodel A'), 'i går'),
+    job(T('s_08', 'frame', 1), 'frame', 'Billedmodel B', 6, 'done', ok('Billedmodel B'), 'i går'),
+    job(T('s_02', 'video', 1), 'video', 'Videomodel A', 28, 'done', ok('Videomodel A')),
+    job(T('s_05', 'frame', 1), 'frame', 'Billedmodel A', 7, 'done', ok('Billedmodel A')),
+    job(T('s_03', 'video', 1), 'video', 'Videomodel B', 28, 'failed', [
+      { provider: 'Videomodel A', status: 'failed', note: 'Teknisk fejl: intet svar efter 10 min. Stoppet og bekræftet — ikke betalt.' },
+      { provider: 'Videomodel B', status: 'failed', note: 'Overbelastet (503). Ingen flere providere kan lave dette shot.' }]),
+    job(T('s_04', 'video', 1), 'video', 'Videomodel B', 28, 'generating', [
+      { provider: 'Videomodel A', status: 'failed', note: 'Teknisk fejl: forbindelsen blev afbrudt. Stoppet og bekræftet — ikke betalt.' },
+      { provider: 'Videomodel B', status: 'waiting', note: 'Venter på ledig kapacitet' }]),
+    job(T('s_06', 'frame', 1), 'frame', 'Billedmodel A', 7, 'generating', [{ provider: 'Billedmodel A', status: 'generating', note: '' }]),
+    job({ type: 'asset', id: 'a_vanloc', n: 1 }, 'master', 'Billedmodel B', MASTER_PRICE, 'done', ok('Billedmodel B')),
+  ];
+  jobs.forEach((j) => { if (j.target.type === 'shot') j.target.slot = j.slot; });
+
+  return {
+    id: 'p_golden_test', title: GOLDEN.project.title, demo: true, created: 'for 3 dage siden',
+    idea: { ...GOLDEN_IDEA }, ideaStatus: 'approved',
+    brief: { status: 'approved', version: 1, content: { ...GOLDEN_BRIEF } },
+    dna: { status: 'approved', version: 1, fields: { ...GOLDEN_DNA } },
+    rules: GOLDEN_RULES.map((r) => ({ ...r })),
+    storyboard: { status: 'approved', version: 2 },
+    scenes: SCENES.map((s) => ({ ...s })), shots, assets,
+    budget: { limit: 500, spent: 212 }, providerMode: 'auto',
+    jobs,
+  };
+}
+
+function buildEmptyProject(idea) {
+  return {
+    id: nextId('p'), title: idea.title, created: 'lige nu',
+    idea, ideaStatus: 'draft',
+    brief: { status: 'draft', version: 0, content: null },
+    dna: { status: 'draft', version: 0, fields: Object.fromEntries(DNA_FIELDS.map((f) => [f, ''])) },
+    rules: [],
+    storyboard: { status: 'draft', version: 0 },
+    scenes: [], shots: {}, assets: {},
+    budget: { limit: 500, spent: 0 }, providerMode: 'auto', jobs: [],
+    // Prototype: første video i en ny film demonstrerer failover.
+    flags: { failoverOnFirstVideo: true, failoverUsed: false },
+  };
+}
+
+/* =====================================================================
+   Tilstand
+   ===================================================================== */
+const STORE_KEY = 'film-prototype-v3';
+let S;
+function freshState() {
+  const p = buildGoldenTestProject();
+  return { view: 'projects', pid: null, shotId: null, assetId: null, sbMode: 'strip', briefTab: 'brief', prodTab: 'control', worldTab: 'location',
+    level: 'direct', projects: { [p.id]: p }, order: [p.id], draftIdea: null, sheet: null, toasts: [], playing: null, player: null,
+    frameSel: null, videoSel: null, assetV: null, pkgSel: { masters: true, frames: true, videos: true } };
+}
+function load() {
+  try { const raw = localStorage.getItem(STORE_KEY); if (raw) { const st = JSON.parse(raw); reviveRules(st); st.sheet = null; st.toasts = []; st.playing = null; st.player = null; return st; } } catch (e) { /* ingen lagring */ }
+  return freshState();
+}
+function reviveRules(st) {
+  const byId = Object.fromEntries(assetTemplates().map((t) => [t.id, t.rules]));
+  for (const p of Object.values(st.projects)) for (const a of Object.values(p.assets)) a.rules = byId[a.id] || [];
+}
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(S, (k, v) => (v instanceof RegExp || typeof v === 'function' ? undefined : v))); } catch (e) { /* ingen lagring */ }
+}
+S = load();
+const P = () => S.projects[S.pid];
+
+/* =====================================================================
+   Afledte statusser
+   ===================================================================== */
+const latest = (slot) => slot.versions[slot.versions.length - 1] || null;
+const assetLatest = (a) => a.versions[a.versions.length - 1];
+const assetMasterV = (a) => (a.master ? a.versions.find((v) => v.v === a.master) : null);
+const assetStatus = (a) => assetLatest(a).status;
+const totalSec = (p) => Object.values(p.shots).reduce((a, s) => a + s.duration, 0);
+const shotList = (p) => Object.values(p.shots).sort((a, b) => a.code.localeCompare(b.code));
+
+function staleRefs(p, s) {
+  return s.assets.filter((r) => { const a = p.assets[r.id]; return a && a.master && r.v < a.master && !r.pinned; });
+}
+/* Kontinuitet: aktivernes attributter OG filmens regler, tjekket mod shottets fritekst. */
+function conflicts(p, s) {
+  const text = `${s.action} ${s.notes}`;
+  const out = [];
+  for (const r of s.assets) {
+    const a = p.assets[r.id]; if (!a) continue;
+    const ver = a.versions.find((v) => v.v === r.v) || assetLatest(a);
+    for (const rule of a.rules || []) {
+      const m = text.match(rule.re); if (!m) continue;
+      const allowed = s.deviations.some((d) => d.type === 'attr' && d.assetId === a.id && d.attr === rule.attr);
+      out.push({ type: 'attr', key: `attr:${a.id}:${rule.attr}`, assetId: a.id, assetName: a.name, v: r.v, attr: rule.attr, master: ver.attrs[rule.attr], shot: m[0].trim(), allowed });
+    }
+  }
+  for (const rule of p.rules) {
+    if (!rule.on || !rule.kw) continue;
+    const m = text.match(new RegExp(rule.kw, 'i')); if (!m) continue;
+    const allowed = s.deviations.some((d) => d.type === 'rule' && d.ruleId === rule.id);
+    out.push({ type: 'rule', key: `rule:${rule.id}`, ruleId: rule.id, rule: rule.text, why: rule.why, shot: m[0], allowed });
+  }
+  return out;
+}
+const openConflicts = (p, s) => conflicts(p, s).filter((c) => !c.allowed);
+
+function frameStatus(p, s) {
+  const v = latest(s.frame);
+  if (!v) return 'draft';
+  if (v.status === 'approved' && staleRefs(p, s).length) return 'outdated';
+  return v.status;
+}
+function videoStatus(p, s) {
+  const v = latest(s.video);
+  if (!v) return 'draft';
+  if ((v.status === 'approved' || v.status === 'needs_approval') && (staleRefs(p, s).length || frameStatus(p, s) !== 'approved')) return 'outdated';
+  return v.status;
+}
+function frameGates(p, s) {
+  const g = [];
+  g.push({ ok: p.storyboard.status === 'approved', text: 'Storyboardet er godkendt' });
+  g.push({ ok: p.dna.status === 'approved', text: p.dna.status === 'approved' ? 'Film DNA er godkendt' : 'Film DNA skal godkendes' });
+  const missing = s.assets.map((r) => p.assets[r.id]).filter((a) => !a.master);
+  g.push({ ok: !missing.length, text: missing.length ? `Mangler godkendt master: ${missing.map((a) => a.name).join(', ')}` : 'Alle aktiver har en godkendt master' });
+  const stale = staleRefs(p, s);
+  g.push({ ok: !stale.length, text: stale.length ? `Bygger på en gammel version: ${stale.map((r) => p.assets[r.id].name + ' v' + r.v).join(', ')}` : 'Aktiverne er på nyeste master' });
+  const oc = openConflicts(p, s);
+  g.push({ ok: !oc.length, text: oc.length ? `${oc.length === 1 ? 'Én konflikt' : oc.length + ' konflikter'} skal afklares` : 'Ingen kontinuitetskonflikter' });
+  return g;
+}
+function videoGates(p, s) {
+  const fs = frameStatus(p, s);
+  return [{ ok: fs === 'approved', text: fs === 'approved' ? 'Startframe er godkendt' : 'Kræver en godkendt startframe' }, ...frameGates(p, s).slice(1)];
+}
+const gatesOk = (g) => g.every((x) => x.ok);
+const firstBlock = (g) => (g.find((x) => !x.ok) || {}).text || '';
+
+/* Ét samlet, menneskeligt udsagn pr. shot: hvor er det, og hvad mangler? */
+function shotState(p, s) {
+  const fs = frameStatus(p, s), vs = videoStatus(p, s);
+  if (fs === 'failed' || vs === 'failed') return { st: 'failed', label: 'Fejlet' };
+  if (fs === 'outdated' || vs === 'outdated' || staleRefs(p, s).length) return { st: 'outdated', label: 'Forældet' };
+  if (openConflicts(p, s).length) return { st: 'needs_approval', label: 'Kræver et valg' };
+  if (fs === 'generating' || vs === 'generating') return { st: 'generating', label: 'Genererer' };
+  if (fs === 'needs_approval' || vs === 'needs_approval') return { st: 'needs_approval', label: 'Til gennemsyn' };
+  if (vs === 'approved') return { st: 'approved', label: 'Færdig' };
+  if (fs === 'rejected' || vs === 'rejected') return { st: 'rejected', label: 'Afvist' };
+  if (fs === 'approved') return { st: 'draft', label: gatesOk(videoGates(p, s)) ? 'Klar til video' : 'Mangler noget' };
+  if (gatesOk(frameGates(p, s))) return { st: 'draft', label: 'Klar til startframe' };
+  return { st: 'draft', label: 'Mangler noget' };
+}
+
+function agg(list) {
+  if (!list.length) return 'draft';
+  for (const st of ['failed', 'needs_approval', 'generating', 'outdated', 'rejected']) if (list.includes(st)) return st;
+  if (list.every((x) => x === 'approved')) return 'approved';
+  return 'draft';
+}
+function journey(p) {
+  const shots = shotList(p);
+  const chars = Object.values(p.assets).filter((a) => a.kind === 'character').map(assetStatus);
+  const world = Object.values(p.assets).filter((a) => a.kind !== 'character').map(assetStatus);
+  const frames = shots.map((s) => frameStatus(p, s));
+  const vids = shots.map((s) => videoStatus(p, s));
+  const cnt = (arr, st) => arr.filter((x) => x === st).length;
+  return [
+    { t: 'Idé', status: p.ideaStatus, c: p.ideaStatus === 'approved' ? 'udfyldt' : 'mangler', view: 'brief', tab: 'idea' },
+    { t: 'Brief og DNA', status: agg([p.brief.status, p.dna.status]), c: p.brief.version ? 'v' + p.brief.version : '—', view: 'brief', tab: 'brief' },
+    { t: 'Storyboard', status: p.storyboard.status, c: p.storyboard.version ? `${shots.length} shots` : '—', view: 'storyboard' },
+    { t: 'Karakterer', status: chars.length ? agg(chars) : 'draft', c: `${cnt(chars, 'approved')}/${chars.length}`, view: 'characters' },
+    { t: 'Locations og aktiver', status: world.length ? agg(world) : 'draft', c: `${cnt(world, 'approved')}/${world.length}`, view: 'world' },
+    { t: 'Startframes', status: shots.length ? agg(frames) : 'draft', c: `${cnt(frames, 'approved')}/${shots.length} godkendt`, view: 'production' },
+    { t: 'Video', status: shots.length ? agg(vids) : 'draft', c: `${cnt(vids, 'approved')}/${shots.length} godkendt`, view: 'production' },
+  ];
+}
+
+/* Anbefaling af provider: brugeren ser hvorfor, og kan vælge selv i Avanceret. */
+function recommend(p, s, slot) {
+  const hasChars = s.assets.some((r) => p.assets[r.id] && p.assets[r.id].kind === 'character');
+  let cands, excluded = [], reasons = [];
+  if (slot === 'frame') {
+    cands = hasChars ? [PROVIDERS.frame[0], PROVIDERS.frame[1]] : [PROVIDERS.frame[1], PROVIDERS.frame[0]];
+    reasons = hasChars ? ['shottet har karakterer', 'kan tage op til 4 referencebilleder pr. karakter', 'bedst til at holde ansigter ens'] : ['ingen karakterer i billedet', 'billigere til locations og props'];
+  } else {
+    cands = PROVIDERS.video.filter((m) => s.duration >= m.min && s.duration <= m.max && m.moves.includes(s.camera.move));
+    excluded = PROVIDERS.video.filter((m) => !cands.includes(m)).map((m) => ({ name: m.name, why: !m.moves.includes(s.camera.move) ? `understøtter ikke ${MOVES[s.camera.move].toLowerCase()}` : `højst ${m.max} sek.` }));
+    reasons = ['image-to-video fra den godkendte startframe', `${s.duration} sek.`, `${MOVES[s.camera.move].toLowerCase()} understøttes`];
+  }
+  let pick = cands[0] || null;
+  const chosen = p.providerMode === 'advanced' && s.choice && s.choice[slot] ? cands.find((m) => m.id === s.choice[slot]) : null;
+  if (chosen) pick = chosen;
+  const fallback = cands.find((m) => m !== pick) || null;
+  return { pick, fallback, cands, excluded, reasons, manual: !!chosen };
+}
+const priceFor = (p, s, slot) => { const r = recommend(p, s, slot); return r.pick ? r.pick.price : 0; };
+
+function reviewItems(p) {
+  const items = [];
+  if (p.brief.status === 'needs_approval') items.push({ type: 'brief', title: `Film Brief v${p.brief.version}`, sub: p.brief.content ? p.brief.content.logline : '' });
+  if (p.dna.status === 'needs_approval') items.push({ type: 'dna', title: `Film DNA v${p.dna.version}`, sub: `${p.dna.fields['Genre']} · ${p.dna.fields['Visuelt sprog']}` });
+  if (p.storyboard.status === 'needs_approval') items.push({ type: 'storyboard', title: `Storyboard v${p.storyboard.version}`, sub: `${Object.keys(p.shots).length} shots · ${totalSec(p)} sek.` });
+  for (const a of Object.values(p.assets)) if (assetStatus(a) === 'needs_approval') items.push({ type: 'asset', id: a.id, title: `${a.name} v${assetLatest(a).v}`, sub: `${KIND[a.kind].label} · master-referencer` });
+  for (const s of shotList(p)) {
+    if (frameStatus(p, s) === 'needs_approval') items.push({ type: 'frame', id: s.id, title: `${s.code} · startframe v${latest(s.frame).n}`, sub: s.action });
+    if (videoStatus(p, s) === 'needs_approval') items.push({ type: 'video', id: s.id, title: `${s.code} · video v${latest(s.video).n}`, sub: `${s.duration} sek. · ${MOVES[s.camera.move]}` });
+  }
+  return items;
+}
+function choiceItems(p) {
+  const items = [];
+  for (const s of shotList(p)) {
+    for (const c of openConflicts(p, s)) items.push({ type: 'conflict', id: s.id, title: `${s.code} · ${c.type === 'rule' ? 'Film-regel' : c.attr}`, sub: c.type === 'rule' ? `"${c.shot}" bryder "${c.rule}"` : `Master: ${c.master} — shottet: ${c.shot}` });
+    for (const r of staleRefs(p, s)) items.push({ type: 'stale', id: s.id, title: `${s.code} · ${p.assets[r.id].name}`, sub: `Bygger på v${r.v} — master er nu v${p.assets[r.id].master}` });
+  }
+  return items;
+}
+function packages(p) {
+  const shots = shotList(p);
+  const masters = Object.values(p.assets).filter((a) => ['draft', 'rejected'].includes(assetStatus(a)) && (a.kind !== 'character' || a.consent));
+  const frames = shots.filter((s) => ['draft', 'rejected', 'outdated'].includes(frameStatus(p, s)) && gatesOk(frameGates(p, s)) && latest(s.frame)?.status !== 'generating');
+  const videos = shots.filter((s) => ['draft', 'rejected', 'outdated', 'failed'].includes(videoStatus(p, s)) && gatesOk(videoGates(p, s)));
+  const blocked = shots.filter((s) => !frames.includes(s) && !videos.includes(s) && frameStatus(p, s) !== 'approved' && !['generating', 'needs_approval'].includes(frameStatus(p, s)) && !gatesOk(frameGates(p, s)));
+  return {
+    masters: { list: masters, cost: masters.length * MASTER_PRICE },
+    frames: { list: frames, cost: frames.reduce((a, s) => a + priceFor(p, s, 'frame'), 0) },
+    videos: { list: videos, cost: videos.reduce((a, s) => a + priceFor(p, s, 'video'), 0) },
+    blocked,
+  };
+}
+const runningJobs = (p) => p.jobs.filter((j) => j.status === 'queued' || j.status === 'generating');
+const waitingCount = (p) => reviewItems(p).length + choiceItems(p).length;
+</script>

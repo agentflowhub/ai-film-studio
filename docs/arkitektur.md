@@ -1,4 +1,4 @@
-# AI Film Studio — arkitektur
+# [PRODUCT NAME] — arkitektur
 
 Status: **udkast til godkendelse.** Ingen kode bygges ud over bid 1, før dette
 dokument er godkendt. Dokumentet erstatter faserne i `docs/plan.md`, når det
@@ -8,6 +8,49 @@ Grundprincippet i én sætning: **storyboardet er sandhedskilden, hvert shot
 er en produktionsenhed, og hvert shot peger på versionerede, godkendte
 produktionsaktiver** — så kontinuitet er en egenskab ved datamodellen, ikke
 noget en prompt håber på.
+
+---
+
+## Produkt og testdata
+
+**Produktnavn:** `PRODUCT_NAME = "[PRODUCT NAME]"` — en placeholder, indtil
+brandet er besluttet. Navnet står ét sted (`product.config.json`) og hentes
+derfra af app, prototype og dokumentation. Et brand-skift ændrer ikke den
+funktionelle kerne.
+
+**Produktdefinition:** Et AI-produktionssystem, hvor brugeren instruerer filmen på et menneskeligt niveau, mens systemet håndterer AI-generation, kontinuitet, referencesystem, prompts, modeller, approvals og produktionsstatus.
+
+Produktet er et production control system omkring generativ filmproduktion
+— ikke en "AI video generator".
+
+**Produkt og testdata er adskilt.** Ingen model, tabel, namespace, URL, API
+eller konfiguration er bygget til en bestemt karakter eller film:
+
+```
+Bruger
+ → Filmprojekt → Filmversion
+   → Brief → Film DNA → Filmregler
+   → Karakterer → Locations og aktiver
+   → Storyboard → Shots → Startframes → Videogenerationer
+   → Godkendelser → Produktion → Færdig film
+```
+
+**Golden Test Case** (`fixtures/golden-test-case/`) er det fælles
+testdatasæt: demofilmen *Golden Test Film* med testkarakteren **Sander**,
+hans varevogn, tre locations og 12 shots. Den bruges til regressionstest af
+karakteridentitet, tøj, ansigt, proportioner, referencetroskab, miljø,
+kamerakomposition, dokumentarisk fotorealisme, billedgenerering,
+image-to-video, startframe-bevarelse, bevægelse, kamerabevægelse, optisk
+zoom, tidsmæssig konsistens, provider-routing, failover, omkostninger og
+godkendelsesflow. Sander er data — aldrig produktnavn, projektnavn eller
+brand — og kan erstattes af en anden karakter, en kundes karakter eller en
+anden genre uden kodeændringer. `tests/unit/brand-separation.test.ts`
+håndhæver adskillelsen.
+
+**Film DNA og filmregler** (fra UX-iteration 2) afløser "stilbiblen" i
+afsnit 2–3 og 9: Film DNA er filmens versionerede visuelle grammatik, og
+filmregler er regler, AI'en ikke må bryde uden brugerens tilladelse.
+Detaljerne skrives ind i skemaet, når MVP 1 planlægges.
 
 ---
 
@@ -424,7 +467,7 @@ på `generations` og `shots`.
 
 ```
 ┌───────────────────────────────────────────────────────────────────────┐
-│ AI Film Studio                         Sander bliver afbrudt  ▾   JN  │
+│ [PRODUCT NAME]                         Golden Test Film  ▾        JN  │
 ├──────────────┬────────────────────────────────────────────────────────┤
 │ Brief      ✓ │  STORYBOARD                   [Gitter] [Tabel]  Filter │
 │ Manus      ✓ │  Scene 1 · Villavejen, morgen                          │
@@ -604,8 +647,9 @@ beløb — aldrig en generel "kør bare".
 | **4 — Lyd** | Stemme pr. karakter, replikker, ambience, SFX | Ny |
 | **5 — Klipning** | Tidslinje, render-worker (ffmpeg), eksport | Ny infrastruktur (0.3) |
 
-**Sander er testprojektet** gennem alle faser: én karakter, én varevogn,
-2–3 locations, 10–15 shots. Hver MVP er først færdig, når Sander-filmen kan
+**Golden Test Case er testfilmen** gennem alle faser
+(`fixtures/golden-test-case/`): testkarakteren Sander, en varevogn, tre
+locations og 12 shots. Hver MVP er først færdig, når Golden Test Film kan
 føres igennem den.
 
 ---
@@ -616,7 +660,7 @@ føres igennem den.
 |---|---|---|---|
 | 1 | Frontend: Next.js eller behold Vite + Edge Functions | **Behold** (0.2) | Nu |
 | 2 | Godkend dette dokument som grundlag for MVP 1 | — | Nu |
-| 3 | Første billed-provider og første video-provider | Vælg efter test med Sanders referencer | Før MVP 2 |
+| 3 | Første billed-provider og første video-provider | Vælg efter test med Golden Test Case' referencer | Før MVP 2 |
 | 4 | Hvem betaler provider-kreditter (platformen eller kunden) og prissætning | — | Før MVP 2 |
 | 5 | Hvor render-workeren kører | Container-tjeneste med ffmpeg | Før MVP 5 |
 | 6 | Hvem er brugeren: bureauer, SMV'er med egen marketing eller indholdsskabere | Påvirker UI-tæthed og pris | Før MVP 2 |

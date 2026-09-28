@@ -29,11 +29,11 @@ const base = { config: modelFor('brief.generate'), system: 'system', user: 'user
 describe('generateStructured', () => {
   it('returnerer valideret output og forbrug', async () => {
     let sent: Record<string, unknown> = {};
-    const client = fakeClient({ stop_reason: 'end_turn', parsed_output: { title: 'Sander' } }, (p) => {
+    const client = fakeClient({ stop_reason: 'end_turn', parsed_output: { title: 'Testfilm' } }, (p) => {
       sent = p as Record<string, unknown>;
     });
     const result = await generateStructured(client, base);
-    expect(result).toEqual({ data: { title: 'Sander' }, model: 'claude-opus-5', usage: { input_tokens: 100, output_tokens: 50 } });
+    expect(result).toEqual({ data: { title: 'Testfilm' }, model: 'claude-opus-5', usage: { input_tokens: 100, output_tokens: 50 } });
     expect(sent.model).toBe('claude-opus-5');
     expect(sent.thinking).toEqual({ type: 'adaptive' });
     expect(sent.fallbacks).toBe('default');

@@ -1,6 +1,12 @@
-# AI Film Studio
+# [PRODUCT NAME]
 
-Et orkestreringslag, der fører en film fra idé til færdigt klip. Softwaren er
+> Produktnavnet er ikke besluttet. `[PRODUCT NAME]` er en placeholder, som
+> står ét sted: `product.config.json`.
+
+Et AI-produktionssystem, hvor brugeren instruerer filmen på et menneskeligt niveau, mens systemet håndterer AI-generation, kontinuitet, referencesystem, prompts, modeller, approvals og produktionsstatus.
+
+Det er et production control system omkring generativ filmproduktion — ikke
+en "AI video generator". Et orkestreringslag fører en film fra idé til færdigt klip. Softwaren er
 **instruktøren og produktionslederen, ikke kameraet**: billed- og
 videogenerering kommer fra specialiserede modeller bag udskiftelige adaptere,
 og et menneske godkender hvert trin, før det næste bygger videre på det.
@@ -10,7 +16,15 @@ Idé → Film Brief → Storyboard → Karakterer → Locations → Props
     → Shots → Startframes → Video → Klip → QA → Færdig film
 ```
 
-Den fulde plan ligger i [`docs/plan.md`](docs/plan.md).
+Arkitekturen ligger i [`docs/arkitektur.md`](docs/arkitektur.md), og den
+klikbare prototype i [`prototype/`](prototype/).
+
+## Golden Test Case
+
+Testdata ligger i [`fixtures/golden-test-case/`](fixtures/golden-test-case/):
+demofilmen *Golden Test Film* med testkarakteren Sander. Den bruges til
+regressionstest af hele kæden fra karakteridentitet til failover. Sander er
+data — aldrig produktets navn eller brand.
 
 ## Status: bid 1 — Instruktøren
 
@@ -51,6 +65,7 @@ npm run dev
 | `npm run test` | Enhedstests (politik, timing, skemaer, Claude-adapter, fejltekster) |
 | `npm run test:db` | RLS- og godkendelsestests mod en rigtig Postgres (se `tests/db/README.md`) |
 | `npm run lint` | ESLint + TypeScript + `deno check` af Edge Functions |
+| `npm run prototype:build` | Bygger prototypen fra `prototype/src` med produktnavn og Golden Test Case |
 
 ## Arkitektur i korte træk
 

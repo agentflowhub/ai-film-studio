@@ -47,7 +47,7 @@ describe('BriefGenerateRequestSchema', () => {
 describe('FilmBriefSchema', () => {
   it('kræver mindst én karakter og ét nøgleøjeblik', () => {
     const brief = {
-      title: 'Sander bliver afbrudt',
+      title: 'Testfilm: ti minutter',
       logline: 'En håndværker forsøger at nå én opgave.',
       message: answers.message,
       audience: answers.audience,

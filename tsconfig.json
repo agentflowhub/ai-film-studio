@@ -10,8 +10,9 @@
     "skipLibCheck": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
     "types": ["node"]
   },
-  "include": ["tests", "supabase/functions/_shared", "vite.config.ts", "vitest.config.ts", "vitest.db.config.ts"],
+  "include": ["tests", "fixtures", "product.config.json", "prototype/build.mjs", "supabase/functions/_shared", "vite.config.ts", "vitest.config.ts", "vitest.db.config.ts"],
   "exclude": ["supabase/functions/_shared/runtime.ts"]
 }

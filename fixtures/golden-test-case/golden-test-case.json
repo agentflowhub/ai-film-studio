@@ -1,0 +1,607 @@
+{
+  "$schema_note": "Golden Test Case — fælles testdatasæt. Sander er en fiktiv testkarakter (data), aldrig produktnavn eller brand.",
+  "id": "golden-test-case",
+  "version": 1,
+  "project": {
+    "title": "Golden Test Film",
+    "label": "Demo",
+    "film_working_title": "Ti minutter"
+  },
+  "idea": {
+    "title": "Golden Test Film",
+    "idea": "En 60 sekunders mockumentary om Sander, en dansk håndværker, der altid bliver afbrudt af kunder.",
+    "message": "Sander er en helt almindelig håndværker, men hans arbejdsdag går aldrig som planlagt.",
+    "audience": "Danske håndværkere og deres kunder",
+    "feeling": "Genkendelse og et smil",
+    "duration": 60,
+    "style": "Mockumentary",
+    "shots": 12
+  },
+  "brief": {
+    "logline": "En tømrer skal bare lige skifte et dørhængsel — ti minutter — men kunderne har andre planer.",
+    "message": "Sander er en helt almindelig håndværker, men hans arbejdsdag udvikler sig altid anderledes end planlagt.",
+    "audience": "Danske håndværkere og deres kunder",
+    "feeling": "Genkendelse og et smil",
+    "duration": 60,
+    "style": "Mockumentary",
+    "tone": "Tør, lun humor. Sander taler direkte til kameraet.",
+    "moments": [
+      "Sander lover: ti minutter",
+      "Telefonen ringer — det er Fru Holm",
+      "Fru Holms liste vokser",
+      "Sander i varevognen om aftenen: \"Ti minutter.\""
+    ],
+    "questions": [
+      "Skal Sander have en kollega med? Jeg har valgt nej, så han står alene med kunderne."
+    ]
+  },
+  "film_dna": {
+    "Genre": "Observerende mockumentary",
+    "Visuelt sprog": "Naturalistisk dokumentar",
+    "Kamera": "Håndholdt, optisk zoom, en operatør der ikke altid rammer perfekt",
+    "Lys": "Naturligt, tilgængeligt lys",
+    "Spil": "Underspillet",
+    "Farver": "Kølig dagslysambient, varme praktiske lyskilder",
+    "Tekstur": "Naturlig hud, slidt stof, ægte snavs",
+    "Klipning": "Minimal og observerende"
+  },
+  "film_rules": [
+    {
+      "id": "r1",
+      "text": "Ingen droneoptagelser",
+      "kw": "drone\\w*|luftfoto\\w*|fugleperspektiv",
+      "why": "filmen er filmet af én person med et håndholdt kamera"
+    },
+    {
+      "id": "r2",
+      "text": "Ingen overdrevne kamerabevægelser",
+      "kw": "whip.?pan|kranoptagelse\\w*|hurtige? kamerabevægelse\\w*",
+      "why": "kameraet skal føles som en dokumentarfotograf, ikke en actionfilm"
+    },
+    {
+      "id": "r3",
+      "text": "Intet skønhedslys",
+      "kw": "skønhedslys|glamour\\w*|studielys",
+      "why": "alt lys skal kunne findes på stedet"
+    },
+    {
+      "id": "r4",
+      "text": "Intet overspil",
+      "kw": "overdrevet|overspil\\w*|grimasse\\w*",
+      "why": "humoren kommer fra det underspillede"
+    },
+    {
+      "id": "r5",
+      "text": "Ingen kunstig baggrundsuskarphed",
+      "kw": "bokeh|uskarp baggrund",
+      "why": "dokumentarlook med dybdeskarphed"
+    },
+    {
+      "id": "r6",
+      "text": "Intet rent eller nyt tøj",
+      "kw": "helt nyt|nystrøget|skinnende ren\\w*",
+      "why": "håndværkertøj er slidt"
+    },
+    {
+      "id": "r7",
+      "text": "Ingen musik, medmindre den er bestilt",
+      "kw": "musik\\w*|soundtrack",
+      "why": "lyden er stedets egen"
+    },
+    {
+      "id": "r8",
+      "text": "Bevar dansk hverdagsrealisme",
+      "kw": "",
+      "why": "det genkendelige er pointen"
+    }
+  ],
+  "assets": [
+    {
+      "id": "a_sander",
+      "code": "CHAR_SANDER_01",
+      "kind": "character",
+      "name": "Sander",
+      "role": "Hovedperson · tømrer",
+      "look": "sander",
+      "attrs": {
+        "Alder": "47",
+        "Bygning": "kraftig, 1,85 m",
+        "Hår": "kort, gråsprængt",
+        "Skæg": "fuldskæg, gråt",
+        "Hovedbeklædning": "mørkegrå flat cap",
+        "Overdel": "marineblå arbejdsjakke",
+        "Underdel": "sorte arbejdsbukser",
+        "Kendetegn": "blyant bag højre øre"
+      },
+      "rules": [
+        {
+          "attr": "Hovedbeklædning",
+          "pattern": "((?:blå|rød|sort|hvid|grøn|gul)e?\\s)?(baseballkasket|kasket|strikhue|cowboyhat)",
+          "flags": "i"
+        },
+        {
+          "attr": "Overdel",
+          "pattern": "((?:rød|grøn|gul|orange|hvid)e?\\s)(jakke|skjorte|trøje|hættetrøje)",
+          "flags": "i"
+        }
+      ],
+      "consent": true
+    },
+    {
+      "id": "a_holm",
+      "code": "CHAR_HOLM_01",
+      "kind": "character",
+      "name": "Fru Holm",
+      "role": "Kunden",
+      "look": "holm",
+      "attrs": {
+        "Alder": "74",
+        "Hår": "lyst gråt, sat op i knold",
+        "Overdel": "lilla cardigan",
+        "Briller": "guldstel",
+        "Væremåde": "venlig, men har altid én ting mere"
+      },
+      "rules": [
+        {
+          "attr": "Hår",
+          "pattern": "(langt|kort|sort|rødt|blondt)\\s(hår)",
+          "flags": "i"
+        }
+      ],
+      "consent": false
+    },
+    {
+      "id": "a_per",
+      "code": "CHAR_PER_01",
+      "kind": "character",
+      "name": "Per",
+      "role": "Naboen",
+      "look": "per",
+      "attrs": {
+        "Alder": "58",
+        "Hår": "brunt, tyndt",
+        "Overdel": "grøn strik",
+        "Væremåde": "snakkesalig"
+      },
+      "rules": [],
+      "consent": false
+    },
+    {
+      "id": "a_villavej",
+      "code": "LOC_VILLAVEJ_01",
+      "kind": "location",
+      "name": "Villavejen",
+      "role": "Sanders første kunde",
+      "look": "villavej",
+      "attrs": {
+        "Arkitektur": "gule murstens-rækkehuse fra 60'erne",
+        "Tid på dagen": "morgen, kl. 7.30",
+        "Lys": "overskyet, blødt",
+        "Vejr": "tørt, efterår",
+        "Farvepalet": "gul mursten, grå asfalt, mørkegrønne hække",
+        "Kendetegn": "hvid postkasse ved nr. 14"
+      },
+      "rules": [
+        {
+          "attr": "Vejr",
+          "pattern": "(regnvejr|sne|solskin|tåge)",
+          "flags": "i"
+        }
+      ]
+    },
+    {
+      "id": "a_koekken",
+      "code": "LOC_KOEKKEN_01",
+      "kind": "location",
+      "name": "Fru Holms køkken",
+      "role": "Interiør",
+      "look": "koekken",
+      "attrs": {
+        "Arkitektur": "70'er-køkken i teak",
+        "Tid på dagen": "eftermiddag",
+        "Lys": "lavt sollys fra vinduet",
+        "Farvepalet": "teak, mintgrønne fliser, hvidt køleskab"
+      },
+      "rules": []
+    },
+    {
+      "id": "a_vanloc",
+      "code": "LOC_VAREVOGN_01",
+      "kind": "location",
+      "name": "I varevognen",
+      "role": "Førerhus",
+      "look": "varevogn",
+      "attrs": {
+        "Arkitektur": "førerhus i Sanders varevogn",
+        "Tid på dagen": "aften",
+        "Lys": "gadelys gennem forruden",
+        "Farvepalet": "mørkegrå, varm gul"
+      },
+      "rules": []
+    },
+    {
+      "id": "a_van",
+      "code": "VEH_VAN_01",
+      "kind": "vehicle",
+      "name": "Sanders varevogn",
+      "role": "Køretøj",
+      "look": "van",
+      "attrs": {
+        "Model": "hvid kassevogn, 2019",
+        "Logo": "SANDER · TØMRER, blå tekst",
+        "Stand": "lidt snavset, bulet bagdør"
+      },
+      "rules": []
+    },
+    {
+      "id": "a_phone",
+      "code": "PROP_TELEFON_01",
+      "kind": "prop",
+      "name": "Sanders telefon",
+      "role": "Prop",
+      "look": "phone",
+      "attrs": {
+        "Udseende": "sort, revnet skærm i øverste hjørne"
+      },
+      "rules": []
+    },
+    {
+      "id": "a_note",
+      "code": "PROP_SEDDEL_01",
+      "kind": "prop",
+      "name": "Fru Holms huskeseddel",
+      "role": "Prop",
+      "look": "note",
+      "attrs": {
+        "Udseende": "gul seddel, håndskrevet med kuglepen",
+        "Tekst": "hængsel · lampe · vandhane · maling"
+      },
+      "rules": []
+    }
+  ],
+  "scenes": [
+    {
+      "id": "sc1",
+      "n": 1,
+      "heading": "Villavejen, morgen",
+      "purpose": "Etablerer Sander og hans plan: ti minutter."
+    },
+    {
+      "id": "sc2",
+      "n": 2,
+      "heading": "Fru Holms køkken",
+      "purpose": "Én opgave bliver til fire."
+    },
+    {
+      "id": "sc3",
+      "n": 3,
+      "heading": "Villavejen, eftermiddag",
+      "purpose": "Naboen vil også lige have hjælp."
+    },
+    {
+      "id": "sc4",
+      "n": 4,
+      "heading": "I varevognen, aften",
+      "purpose": "Pointen: ti minutter."
+    }
+  ],
+  "shots": [
+    {
+      "code": "SHOT_01",
+      "scene": "sc1",
+      "duration": 5,
+      "camera": {
+        "type": "wide",
+        "lens": 24,
+        "move": "static"
+      },
+      "action": "Sander går hen mod varevognen med værktøjskassen. Han har travlt, men ikke mere end han plejer.",
+      "dialogue": "",
+      "notes": "",
+      "lighting": "overskyet morgenlys",
+      "performance": "Underspillet",
+      "audio": "Villavej-ambience, fugle, en bil i det fjerne",
+      "assets": [
+        "a_sander",
+        "a_villavej",
+        "a_van"
+      ]
+    },
+    {
+      "code": "SHOT_02",
+      "scene": "sc1",
+      "duration": 6,
+      "camera": {
+        "type": "medium_closeup",
+        "lens": 85,
+        "move": "optical_zoom"
+      },
+      "action": "Sander står ved varevognen og ser ind i kameraet. Efter et sekund zoomer kameraet langsomt ind på hans ansigt.",
+      "dialogue": "Jeg skal bare lige skifte et dørhængsel. Ti minutter.",
+      "notes": "",
+      "lighting": "overskyet morgenlys",
+      "performance": "Underspillet",
+      "audio": "Villavej-ambience, fugle, en bil i det fjerne",
+      "assets": [
+        "a_sander",
+        "a_villavej",
+        "a_van"
+      ]
+    },
+    {
+      "code": "SHOT_03",
+      "scene": "sc1",
+      "duration": 3,
+      "camera": {
+        "type": "insert",
+        "lens": 50,
+        "move": "static"
+      },
+      "action": "Telefonen ringer. På skærmen står \"Fru Holm\".",
+      "dialogue": "",
+      "notes": "",
+      "lighting": "overskyet morgenlys",
+      "performance": "Underspillet",
+      "audio": "Villavej-ambience, fugle, en bil i det fjerne",
+      "assets": [
+        "a_phone"
+      ]
+    },
+    {
+      "code": "SHOT_04",
+      "scene": "sc1",
+      "duration": 5,
+      "camera": {
+        "type": "medium",
+        "lens": 35,
+        "move": "handheld"
+      },
+      "action": "Sander tager telefonen og nikker opgivende, mens han lytter.",
+      "dialogue": "",
+      "notes": "",
+      "lighting": "overskyet morgenlys",
+      "performance": "Træt",
+      "audio": "Villavej-ambience, fugle, en bil i det fjerne",
+      "assets": [
+        "a_sander",
+        "a_villavej",
+        "a_van"
+      ]
+    },
+    {
+      "code": "SHOT_05",
+      "scene": "sc2",
+      "duration": 6,
+      "camera": {
+        "type": "wide",
+        "lens": 28,
+        "move": "static"
+      },
+      "action": "Fru Holm viser Sander det løse dørhængsel. Han nikker, hun taler videre.",
+      "dialogue": "",
+      "notes": "",
+      "lighting": "lavt eftermiddagslys",
+      "performance": "Naturligt",
+      "audio": "Køkkenur, køleskabssummen",
+      "assets": [
+        "a_sander",
+        "a_holm",
+        "a_koekken"
+      ]
+    },
+    {
+      "code": "SHOT_06",
+      "scene": "sc2",
+      "duration": 4,
+      "camera": {
+        "type": "closeup",
+        "lens": 85,
+        "move": "static"
+      },
+      "action": "Fru Holm smiler forsigtigt, som om hun lige er kommet i tanke om noget.",
+      "dialogue": "Og når du nu er her … lampen i gangen blinker også.",
+      "notes": "",
+      "lighting": "lavt eftermiddagslys",
+      "performance": "Naturligt",
+      "audio": "Køkkenur, køleskabssummen",
+      "assets": [
+        "a_holm",
+        "a_koekken"
+      ]
+    },
+    {
+      "code": "SHOT_07",
+      "scene": "sc2",
+      "duration": 6,
+      "camera": {
+        "type": "medium_closeup",
+        "lens": 85,
+        "move": "optical_zoom"
+      },
+      "action": "Sander ser ind i kameraet og venter. Han siger ingenting.",
+      "dialogue": "",
+      "notes": "Sander har en blå baseballkasket på og ser træt ud.",
+      "lighting": "lavt eftermiddagslys",
+      "performance": "Underspillet",
+      "audio": "Køkkenur, køleskabssummen",
+      "assets": [
+        "a_sander",
+        "a_koekken"
+      ]
+    },
+    {
+      "code": "SHOT_08",
+      "scene": "sc2",
+      "duration": 4,
+      "camera": {
+        "type": "insert",
+        "lens": 50,
+        "move": "static"
+      },
+      "action": "Huskesedlen på køleskabet: hængsel, lampe, vandhane, maling.",
+      "dialogue": "",
+      "notes": "",
+      "lighting": "lavt eftermiddagslys",
+      "performance": "Underspillet",
+      "audio": "Køkkenur, køleskabssummen",
+      "assets": [
+        "a_note",
+        "a_koekken"
+      ]
+    },
+    {
+      "code": "SHOT_09",
+      "scene": "sc3",
+      "duration": 5,
+      "camera": {
+        "type": "wide",
+        "lens": 24,
+        "move": "pan"
+      },
+      "action": "Naboen Per vinker Sander over hækken.",
+      "dialogue": "",
+      "notes": "",
+      "lighting": "gråt eftermiddagslys",
+      "performance": "Naturligt",
+      "audio": "Villavej-ambience, fugle, en bil i det fjerne",
+      "assets": [
+        "a_sander",
+        "a_per",
+        "a_villavej"
+      ]
+    },
+    {
+      "code": "SHOT_10",
+      "scene": "sc3",
+      "duration": 4,
+      "camera": {
+        "type": "medium",
+        "lens": 35,
+        "move": "handheld"
+      },
+      "action": "Sander bærer en stige hen over vejen.",
+      "dialogue": "",
+      "notes": "Dronen følger Sander ovenfra, mens han krydser vejen.",
+      "lighting": "gråt eftermiddagslys",
+      "performance": "Underspillet",
+      "audio": "Villavej-ambience, fugle, en bil i det fjerne",
+      "assets": [
+        "a_sander",
+        "a_villavej"
+      ]
+    },
+    {
+      "code": "SHOT_11",
+      "scene": "sc4",
+      "duration": 6,
+      "camera": {
+        "type": "medium",
+        "lens": 35,
+        "move": "static"
+      },
+      "action": "Sander sætter sig ind i varevognen og sukker.",
+      "dialogue": "",
+      "notes": "",
+      "lighting": "gadelys",
+      "performance": "Træt",
+      "audio": "Motor i tomgang, regn på taget",
+      "assets": [
+        "a_sander",
+        "a_vanloc"
+      ]
+    },
+    {
+      "code": "SHOT_12",
+      "scene": "sc4",
+      "duration": 6,
+      "camera": {
+        "type": "closeup",
+        "lens": 85,
+        "move": "optical_zoom"
+      },
+      "action": "Sander ser ind i kameraet og smiler træt.",
+      "dialogue": "Ti minutter.",
+      "notes": "",
+      "lighting": "gadelys",
+      "performance": "Træt",
+      "audio": "Motor i tomgang, regn på taget",
+      "assets": [
+        "a_sander",
+        "a_vanloc"
+      ]
+    }
+  ],
+  "cut_order": [
+    "SHOT_01",
+    "SHOT_02",
+    "SHOT_03",
+    "SHOT_05",
+    "SHOT_07",
+    "SHOT_12",
+    "SHOT_08",
+    "SHOT_11",
+    "SHOT_04",
+    "SHOT_06",
+    "SHOT_10",
+    "SHOT_09"
+  ],
+  "scenarios": [
+    {
+      "id": "continuity-headwear",
+      "shot": "SHOT_07",
+      "expect": "Kontinuitetskonflikt: noter siger \"blå baseballkasket\", Sander v1 siger \"mørkegrå flat cap\""
+    },
+    {
+      "id": "film-rule-drone",
+      "shot": "SHOT_10",
+      "expect": "Filmregel brudt: \"Dronen følger Sander ovenfra\" mod \"Ingen droneoptagelser\""
+    },
+    {
+      "id": "outdated-vehicle",
+      "asset": "a_van",
+      "expect": "Varevogn v2 bliver master; shots på v1 bliver forældede",
+      "new_version": {
+        "attrs": {
+          "Logo": "SANDER TØMRER & SNEDKER, orange stribe"
+        },
+        "note": "Nyt firmalogo"
+      }
+    },
+    {
+      "id": "consent-required",
+      "asset": "a_holm",
+      "expect": "Karakter uden samtykke kan ikke få genereret billeder"
+    },
+    {
+      "id": "provider-failover",
+      "shot": "SHOT_04",
+      "expect": "Videomodel A fejler teknisk, stoppes og bekræftes, Videomodel B overtager uden dobbeltbetaling"
+    },
+    {
+      "id": "unsupported-movement",
+      "shot": "SHOT_02",
+      "expect": "Optisk zoom udelukker Videomodel B; routeren forklarer hvorfor"
+    }
+  ],
+  "regression_areas": [
+    "Character identity preservation",
+    "Clothing consistency",
+    "Facial structure",
+    "Body proportions",
+    "Reference adherence",
+    "Environment consistency",
+    "Camera composition",
+    "Documentary photorealism",
+    "Image generation",
+    "Image-to-video consistency",
+    "Startframe preservation",
+    "Motion",
+    "Camera movement",
+    "Optical zoom",
+    "Temporal consistency",
+    "Provider routing",
+    "Provider failover",
+    "Cost tracking",
+    "Approval flow"
+  ]
+}
