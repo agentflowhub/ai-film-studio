@@ -1,0 +1,1568 @@
+<title>AI Film Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #f3f4f7;
+  --surface: #ffffff;
+  --surface-2: #f8f9fb;
+  --ink: #15171c;
+  --muted: #5d6370;
+  --faint: #8b91a0;
+  --line: #e2e5eb;
+  --line-strong: #cfd4dd;
+  --accent: #0b5fd1;
+  --accent-ink: #ffffff;
+  --accent-soft: #e7effc;
+  --focus: #0b5fd1;
+
+  --st-draft-bg: #eef0f4;     --st-draft: #4b5260;
+  --st-gen-bg: #e5efff;       --st-gen: #0b5fd1;
+  --st-need-bg: #fff1d6;      --st-need: #8a4b00;
+  --st-ok-bg: #e2f4e8;        --st-ok: #17693b;
+  --st-rej-bg: #fde8e7;       --st-rej: #a4221a;
+  --st-old-bg: #efe8fd;       --st-old: #5b35b0;
+  --st-fail-bg: #fbe3e1;      --st-fail: #b01d12;
+
+  --shadow: 0 1px 2px rgba(20, 24, 33, .06), 0 4px 16px rgba(20, 24, 33, .05);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --sans: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #111318; --surface: #1a1d24; --surface-2: #20242c; --ink: #eceef3; --muted: #a3a9b6; --faint: #7d8494;
+    --line: #2b3039; --line-strong: #3a404b; --accent: #5b9bff; --accent-ink: #0b1220; --accent-soft: #1b2a44; --focus: #7fb0ff;
+    --st-draft-bg: #262a33; --st-draft: #b7bcc8; --st-gen-bg: #172a4a; --st-gen: #8cb8ff; --st-need-bg: #3a2a0f; --st-need: #ffc56b;
+    --st-ok-bg: #12301f; --st-ok: #7fd9a1; --st-rej-bg: #3b1715; --st-rej: #ff9a92; --st-old-bg: #2a1f45; --st-old: #c3a8ff;
+    --st-fail-bg: #3d1311; --st-fail: #ff8479; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111318; --surface: #1a1d24; --surface-2: #20242c; --ink: #eceef3; --muted: #a3a9b6; --faint: #7d8494;
+  --line: #2b3039; --line-strong: #3a404b; --accent: #5b9bff; --accent-ink: #0b1220; --accent-soft: #1b2a44; --focus: #7fb0ff;
+  --st-draft-bg: #262a33; --st-draft: #b7bcc8; --st-gen-bg: #172a4a; --st-gen: #8cb8ff; --st-need-bg: #3a2a0f; --st-need: #ffc56b;
+  --st-ok-bg: #12301f; --st-ok: #7fd9a1; --st-rej-bg: #3b1715; --st-rej: #ff9a92; --st-old-bg: #2a1f45; --st-old: #c3a8ff;
+  --st-fail-bg: #3d1311; --st-fail: #ff8479; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 14px; line-height: 1.45; }
+button, input, select, textarea { font: inherit; color: inherit; }
+h1, h2, h3 { margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+h1 { font-size: 24px; font-weight: 700; }
+h2 { font-size: 17px; font-weight: 650; }
+h3 { font-size: 14px; font-weight: 650; }
+p { margin: 0; }
+.mono { font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.faint { color: var(--faint); }
+.small { font-size: 12.5px; }
+.label { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+
+/* ---------- shell ---------- */
+.app { display: grid; grid-template-columns: 236px 1fr; grid-template-rows: auto 1fr auto; min-height: 100%; }
+.topbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--line); position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; cursor: pointer; border: 0; background: none; padding: 0; }
+.brand-mark { width: 26px; height: 26px; border-radius: 7px; background: var(--ink); display: grid; place-items: center; }
+.brand-mark svg { width: 16px; height: 16px; }
+.crumb { color: var(--muted); display: flex; gap: 8px; align-items: center; min-width: 0; }
+.crumb strong { color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar .spacer { flex: 1; }
+.proto-tag { font-size: 11.5px; color: var(--muted); border: 1px dashed var(--line-strong); padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+
+.sidenav { background: var(--surface); border-right: 1px solid var(--line); padding: 16px 12px; display: flex; flex-direction: column; gap: 18px; }
+.navgroup { display: flex; flex-direction: column; gap: 2px; }
+.navgroup .label { padding: 0 10px 6px; }
+.navitem { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; border: 0; background: none; text-align: left; cursor: pointer; color: var(--ink); width: 100%; }
+.navitem:hover { background: var(--surface-2); }
+.navitem.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.navitem .step { font-family: var(--mono); font-size: 11px; color: var(--faint); width: 16px; }
+.navitem.active .step { color: var(--accent); }
+.navitem .grow { flex: 1; }
+.navitem .dot { width: 8px; height: 8px; border-radius: 50%; }
+.badge { font-size: 11px; font-weight: 600; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; display: inline-grid; place-items: center; background: var(--st-need-bg); color: var(--st-need); }
+.badge.gen { background: var(--st-gen-bg); color: var(--st-gen); }
+
+main { padding: 24px clamp(16px, 3vw, 32px) 40px; min-width: 0; }
+.statusbar { grid-column: 1 / -1; background: var(--surface); border-top: 1px solid var(--line); padding: 10px 20px calc(10px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; position: sticky; bottom: 0; z-index: 20; }
+.statusbar b { font-variant-numeric: tabular-nums; }
+.statusbar .sep { color: var(--line-strong); }
+
+/* ---------- common ---------- */
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.stack.tight { gap: 8px; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.row.between { justify-content: space-between; }
+.row.top { align-items: flex-start; }
+.grow { flex: 1; min-width: 0; }
+.pagehead { display: flex; justify-content: space-between; gap: 16px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 20px; }
+.pagehead .sub { color: var(--muted); margin-top: 4px; max-width: 70ch; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+.card.pad-lg { padding: 22px; }
+.card.flush { padding: 0; overflow: hidden; }
+.divider { height: 1px; background: var(--line); }
+.cols { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.cols.even { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.cols.side { grid-template-columns: 280px minmax(0, 1fr); }
+
+.btn { display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--surface); cursor: pointer; font-weight: 550; white-space: nowrap; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.06); }
+.btn.approve { background: var(--st-ok); border-color: var(--st-ok); color: var(--surface); }
+.btn.reject { color: var(--st-rej); }
+.btn.ghost { border-color: transparent; background: none; color: var(--accent); padding-inline: 6px; }
+.btn.sm { padding: 5px 10px; font-size: 13px; }
+.btn:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+.btn .cost { font-family: var(--mono); font-size: 11.5px; opacity: .85; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 9px 3px 7px; border-radius: 999px; white-space: nowrap; line-height: 1.3; }
+.pill::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.draft { background: var(--st-draft-bg); color: var(--st-draft); }
+.pill.draft::before { background: none; border: 1.5px solid currentColor; width: 5px; height: 5px; }
+.pill.generating { background: var(--st-gen-bg); color: var(--st-gen); }
+.pill.generating::before { animation: pulse 1s ease-in-out infinite; }
+.pill.needs_approval { background: var(--st-need-bg); color: var(--st-need); }
+.pill.approved { background: var(--st-ok-bg); color: var(--st-ok); }
+.pill.rejected { background: var(--st-rej-bg); color: var(--st-rej); }
+.pill.outdated { background: var(--st-old-bg); color: var(--st-old); }
+.pill.failed { background: var(--st-fail-bg); color: var(--st-fail); }
+.pill.locked { background: transparent; color: var(--faint); border: 1px dashed var(--line-strong); }
+.pill.locked::before { display: none; }
+.pill.bare { padding: 0; background: none; }
+@keyframes pulse { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .pill.generating::before, .shimmer, .playing img { animation: none !important; } }
+
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; padding: 3px 8px 3px 4px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); cursor: pointer; white-space: nowrap; }
+.chip:hover { border-color: var(--line-strong); }
+.chip .k { font-family: var(--mono); font-size: 10px; font-weight: 500; padding: 1px 4px; border-radius: 4px; background: var(--line); color: var(--muted); }
+.chip .v { font-family: var(--mono); font-size: 10.5px; color: var(--faint); }
+.chip.stale { border-color: var(--st-old); color: var(--st-old); background: var(--st-old-bg); }
+.chip.stale .v { color: var(--st-old); }
+.chip.warn { border-color: var(--st-need); background: var(--st-need-bg); color: var(--st-need); }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+
+.notice { padding: 11px 14px; border-radius: 10px; font-size: 13.5px; display: flex; gap: 10px; align-items: flex-start; }
+.notice.info { background: var(--accent-soft); color: var(--ink); }
+.notice.warn { background: var(--st-need-bg); color: var(--st-need); }
+.notice.old { background: var(--st-old-bg); color: var(--st-old); }
+.notice.fail { background: var(--st-fail-bg); color: var(--st-fail); }
+.notice.ok { background: var(--st-ok-bg); color: var(--st-ok); }
+.notice .grow p + p { margin-top: 4px; }
+
+label.field { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 600; }
+label.field .hint { font-weight: 400; color: var(--muted); font-size: 12px; }
+input[type=text], input[type=number], textarea, select { background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 8px; padding: 8px 10px; width: 100%; font-weight: 400; }
+textarea { resize: vertical; }
+.formgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.formgrid .full { grid-column: 1 / -1; }
+
+dl.facts { display: grid; grid-template-columns: max-content 1fr; gap: 7px 18px; margin: 0; }
+dl.facts dt { color: var(--muted); }
+dl.facts dd { margin: 0; }
+
+/* ---------- journey ---------- */
+.journey { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 0; overflow-x: auto; }
+.jstep { position: relative; padding: 14px 10px 12px; border-right: 1px solid var(--line); cursor: pointer; background: none; border-top: 0; border-bottom: 0; border-left: 0; text-align: left; display: flex; flex-direction: column; gap: 8px; min-width: 104px; }
+.jstep:last-child { border-right: 0; }
+.jstep:hover { background: var(--surface-2); }
+.jstep .n { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+.jstep .t { font-weight: 650; font-size: 13px; line-height: 1.2; }
+.jstep .c { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.jstep .bar { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--line); }
+.jstep .bar.approved { background: var(--st-ok); } .jstep .bar.needs_approval { background: var(--st-need); } .jstep .bar.generating { background: var(--st-gen); }
+.jstep .bar.failed { background: var(--st-fail); } .jstep .bar.outdated { background: var(--st-old); } .jstep .bar.rejected { background: var(--st-rej); }
+
+/* ---------- frames ---------- */
+.frame { position: relative; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--line); max-width: 100%; }
+.frame svg, .frame img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.frame .empty { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: var(--faint); font-size: 12px; border: 1.5px dashed var(--line-strong); border-radius: 8px; padding: 8px; }
+.frame .over { position: absolute; left: 6px; bottom: 6px; display: flex; gap: 4px; }
+.frame .tc { position: absolute; right: 6px; bottom: 6px; font-family: var(--mono); font-size: 10.5px; color: #fff; background: rgba(0,0,0,.55); padding: 1px 5px; border-radius: 4px; }
+.frame.dim svg { opacity: .45; filter: grayscale(.6); }
+.shimmer { position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, rgba(11,95,209,.14) 45%, transparent 70%) var(--st-gen-bg); background-size: 220% 100%; animation: shim 1.3s linear infinite; display: grid; place-items: center; color: var(--st-gen); font-weight: 600; font-size: 12px; }
+@keyframes shim { to { background-position: -120% 0; } }
+.playbtn { position: absolute; inset: 0; margin: auto; width: 42px; height: 42px; border-radius: 50%; border: 0; background: rgba(0,0,0,.55); cursor: pointer; display: grid; place-items: center; }
+.playbtn svg { width: 16px; height: 16px; }
+.playing svg.scene { animation-duration: var(--dur, 5s); animation-timing-function: linear; animation-fill-mode: forwards; }
+.playing.m-optical_zoom svg.scene { animation-name: zoomIn; transform-origin: 50% 40%; }
+.playing.m-pan svg.scene { animation-name: panR; }
+.playing.m-handheld svg.scene { animation-name: shake; animation-timing-function: ease-in-out; }
+.playing.m-static svg.scene, .playing.m-dolly svg.scene { animation-name: drift; }
+@keyframes zoomIn { to { transform: scale(1.35); } }
+@keyframes panR { from { transform: scale(1.15) translateX(5%); } to { transform: scale(1.15) translateX(-5%); } }
+@keyframes shake { 0%,100% { transform: scale(1.06) translate(0,0) } 25% { transform: scale(1.06) translate(-1%,.6%) } 50% { transform: scale(1.06) translate(.8%,-.5%) } 75% { transform: scale(1.06) translate(-.4%,.8%) } }
+@keyframes drift { to { transform: scale(1.04); } }
+
+/* ---------- storyboard ---------- */
+.scene-block { display: flex; flex-direction: column; gap: 12px; }
+.scene-head { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.scene-head .code { font-family: var(--mono); font-size: 12px; color: var(--faint); }
+.shotgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.shotcard { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; display: flex; flex-direction: column; gap: 9px; cursor: pointer; text-align: left; }
+.shotcard:hover { border-color: var(--line-strong); box-shadow: var(--shadow); }
+.shotcard.is-old { border-color: var(--st-old); }
+.shotcard.is-warn { border-color: var(--st-need); }
+.shotcard .meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.shotcode { font-family: var(--mono); font-weight: 500; font-size: 12.5px; }
+.shotcard .action { font-size: 13px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.7em; }
+.slotrow { display: grid; grid-template-columns: auto 1fr; gap: 5px 8px; align-items: center; font-size: 12px; }
+.slotrow .k { color: var(--muted); }
+
+.tablewrap { overflow-x: auto; }
+table.data { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.data th { text-align: left; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.data td { padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+table.data tr:last-child td { border-bottom: 0; }
+table.data tr.click { cursor: pointer; }
+table.data tr.click:hover td { background: var(--surface-2); }
+table.data .thumb { width: 84px; }
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: var(--surface); padding: 6px 12px; cursor: pointer; font-weight: 550; }
+.seg button.on { background: var(--ink); color: var(--surface); }
+
+/* ---------- assets ---------- */
+.assetlist { display: flex; flex-direction: column; gap: 6px; }
+.assetrow { display: flex; gap: 10px; align-items: center; padding: 8px; border-radius: 10px; border: 1px solid transparent; cursor: pointer; background: none; width: 100%; text-align: left; }
+.assetrow:hover { background: var(--surface); border-color: var(--line); }
+.assetrow.on { background: var(--surface); border-color: var(--accent); }
+.avatar { width: 44px; height: 44px; border-radius: 10px; overflow: hidden; flex: none; background: var(--surface-2); border: 1px solid var(--line); }
+.avatar svg, .avatar img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.refgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+.refslot { display: flex; flex-direction: column; gap: 6px; }
+.refslot .frame { aspect-ratio: 4 / 5; }
+.refslot.wide .frame { aspect-ratio: 16 / 9; }
+.refslot .cap { display: flex; justify-content: space-between; font-size: 12px; gap: 6px; }
+.uploadbtn { position: absolute; inset: 0; display: grid; place-items: center; cursor: pointer; color: var(--accent); font-size: 12px; font-weight: 600; text-align: center; border: 1.5px dashed var(--line-strong); border-radius: 8px; background: var(--surface-2); }
+.uploadbtn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.attrtable { display: grid; grid-template-columns: max-content 1fr; gap: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.attrtable > div { padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.attrtable > div:nth-last-child(-n+2) { border-bottom: 0; }
+.attrtable .k { color: var(--muted); background: var(--surface-2); border-right: 1px solid var(--line); }
+.attrtable input { padding: 4px 8px; }
+.versions { display: flex; gap: 6px; flex-wrap: wrap; }
+.vtab { border: 1px solid var(--line-strong); background: var(--surface); border-radius: 8px; padding: 5px 10px; cursor: pointer; display: inline-flex; gap: 7px; align-items: center; font-size: 12.5px; }
+.vtab.on { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.vtab .star { color: var(--st-ok); font-size: 11px; font-weight: 700; }
+
+/* ---------- shot editor ---------- */
+.editor { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.section-title { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.prompt { font-family: var(--mono); font-size: 12px; line-height: 1.6; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; white-space: pre-wrap; color: var(--muted); }
+.prompt mark { background: var(--st-need-bg); color: var(--st-need); border-radius: 3px; padding: 0 2px; }
+.prompt b { color: var(--ink); font-weight: 500; }
+.contlist { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.controw { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); align-items: center; font-size: 13px; }
+.controw:last-child { border-bottom: 0; }
+.controw.conflict { background: var(--st-need-bg); }
+.controw .res { font-weight: 600; font-size: 12px; }
+.res.match { color: var(--st-ok); } .res.conflict { color: var(--st-need); } .res.dev { color: var(--st-old); }
+.versionstrip { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+.vcard { display: flex; flex-direction: column; gap: 5px; border: 0; background: none; padding: 0; text-align: left; cursor: pointer; }
+.vcard .frame { border-width: 2px; }
+.vcard.on .frame { border-color: var(--accent); }
+.gate { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; color: var(--muted); }
+.gate .ic { width: 16px; flex: none; text-align: center; font-weight: 700; }
+.gate.ok .ic { color: var(--st-ok); } .gate.no .ic { color: var(--st-rej); }
+
+/* ---------- approvals / queue ---------- */
+.approvalitem { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 12px; border-bottom: 1px solid var(--line); }
+.approvalitem:last-child { border-bottom: 0; }
+.approvalitem .frame { width: 150px; }
+.kanban { display: grid; grid-template-columns: repeat(5, minmax(200px, 1fr)); gap: 12px; overflow-x: auto; padding-bottom: 6px; }
+.kcol { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; display: flex; flex-direction: column; gap: 10px; min-height: 160px; }
+.kcol h3 { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+.job { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 7px; font-size: 12.5px; }
+.job .attempts { border-left: 2px solid var(--line-strong); padding-left: 8px; display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: 12px; }
+.job .attempts .bad { color: var(--st-fail); }
+
+/* ---------- sheet / toast ---------- */
+.scrim { position: fixed; inset: 0; background: rgba(15,17,22,.35); z-index: 50; display: grid; place-items: end center; padding: 16px; }
+.sheet { background: var(--surface); border-radius: 16px; width: min(520px, 100%); padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,.25); display: flex; flex-direction: column; gap: 14px; margin-bottom: max(16px, env(safe-area-inset-bottom, 0px)); }
+.sheet .costline { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.sheet .costline:last-of-type { border-bottom: 0; }
+.budget { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; display: flex; }
+.budget i { display: block; height: 100%; }
+.toasts { position: fixed; right: 16px; bottom: 64px; display: flex; flex-direction: column; gap: 8px; z-index: 60; max-width: min(380px, calc(100% - 32px)); }
+.toast { background: var(--ink); color: var(--surface); padding: 10px 14px; border-radius: 10px; font-size: 13px; box-shadow: var(--shadow); }
+
+.projcard { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 18px; cursor: pointer; text-align: left; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+.projcard:hover { box-shadow: var(--shadow); border-color: var(--line-strong); }
+.minijourney { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; }
+.minijourney i { height: 6px; border-radius: 3px; background: var(--line); }
+.minijourney i.approved { background: var(--st-ok); } .minijourney i.needs_approval { background: var(--st-need); } .minijourney i.generating { background: var(--st-gen); }
+.minijourney i.failed { background: var(--st-fail); } .minijourney i.outdated { background: var(--st-old); } .minijourney i.rejected { background: var(--st-rej); }
+.legend { display: flex; gap: 8px; flex-wrap: wrap; }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+.kpi b { font-size: 22px; font-variant-numeric: tabular-nums; display: block; }
+
+@media (max-width: 1100px) {
+  .editor, .cols, .cols.side { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 820px) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .sidenav { flex-direction: row; overflow-x: auto; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--line); gap: 10px; }
+  .navgroup { flex-direction: row; gap: 2px; }
+  .navgroup .label { display: none; }
+  .navitem { width: auto; white-space: nowrap; }
+  .proto-tag { display: none; }
+  .projcard { grid-template-columns: minmax(0, 1fr); }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .formgrid { grid-template-columns: minmax(0, 1fr); }
+  .approvalitem { grid-template-columns: 96px minmax(0, 1fr); }
+  .approvalitem .frame { width: 96px; }
+  .approvalitem .acts { grid-column: 1 / -1; }
+}
+</style>
+
+<div id="root"></div>
+
+<script>
+'use strict';
+
+/* =====================================================================
+   Statusser og tekster
+   ===================================================================== */
+const ST = {
+  draft: 'Kladde',
+  generating: 'Genererer',
+  needs_approval: 'Venter på dig',
+  approved: 'Godkendt',
+  rejected: 'Afvist',
+  outdated: 'Forældet',
+  failed: 'Fejlet',
+};
+const STATUS_ORDER = ['draft', 'generating', 'needs_approval', 'approved', 'rejected', 'outdated', 'failed'];
+const SHOT_TYPES = {
+  extreme_wide: 'Ekstrem total', wide: 'Total', medium: 'Halvtotal', medium_closeup: 'Halvnær',
+  closeup: 'Nær', insert: 'Insert',
+};
+const MOVES = { static: 'Statisk', pan: 'Panorering', handheld: 'Håndholdt', dolly: 'Dolly', optical_zoom: 'Optisk zoom' };
+const KIND = {
+  character: { label: 'Karakter', plural: 'Karakterer', code: 'CHAR' },
+  location: { label: 'Location', plural: 'Locations', code: 'LOC' },
+  vehicle: { label: 'Køretøj', plural: 'Køretøjer', code: 'VEH' },
+  prop: { label: 'Prop', plural: 'Props', code: 'PROP' },
+};
+const REF_ROLES = {
+  character: [['face', 'Ansigt'], ['full_body', 'Helkrop'], ['profile', 'Profil'], ['clothing', 'Påklædning'], ['expression', 'Udtryk']],
+  location: [['establishing', 'Overblik'], ['detail', 'Detalje'], ['light', 'Lys og tid']],
+  vehicle: [['side', 'Side'], ['front', 'Front'], ['logo', 'Logo']],
+  prop: [['object', 'Genstand'], ['detail', 'Detalje']],
+};
+const PRICE = { frame: 7, video: 28, master: 9 };
+const PROVIDERS = { image: ['Billedmodel A', 'Billedmodel B'], video: ['Videomodel A', 'Videomodel B'] };
+
+/* =====================================================================
+   Eksempeldata: Sander
+   ===================================================================== */
+const STYLE_BIBLE = 'Mockumentary · håndholdt dokumentarkamera · 16:9 · naturligt lys · dæmpet efterårspalet · let filmkorn';
+
+const SANDER_BRIEF = {
+  logline: 'En tømrer skal bare lige skifte et dørhængsel — ti minutter — men kunderne har andre planer.',
+  message: 'Sander er en helt almindelig håndværker, men hans arbejdsdag udvikler sig altid anderledes end planlagt.',
+  audience: 'Danske håndværkere og deres kunder',
+  feeling: 'Genkendelse og et smil',
+  duration: 60,
+  style: 'Mockumentary',
+  tone: 'Tør, lun humor. Sander taler direkte til kameraet.',
+  visual: 'Håndholdt dokumentarkamera, naturligt lys, dæmpede efterårsfarver.',
+  moments: ['Sander lover: ti minutter', 'Telefonen ringer — det er Fru Holm', 'Fru Holms liste vokser', 'Sander i varevognen om aftenen: "Ti minutter."'],
+  questions: ['Skal Sander have en kollega med? Jeg har valgt nej, så han står alene med kunderne.'],
+};
+
+const SANDER_IDEA = {
+  title: 'Sander bliver afbrudt',
+  idea: 'En 60 sekunders mockumentary om Sander, en dansk håndværker, der altid bliver afbrudt af kunder.',
+  message: 'Sander er en helt almindelig håndværker, men hans arbejdsdag går aldrig som planlagt.',
+  audience: 'Danske håndværkere og deres kunder',
+  feeling: 'Genkendelse og et smil',
+  duration: 60,
+  style: 'Mockumentary',
+};
+
+function assetTemplates() {
+  return [
+    { id: 'a_sander', code: 'CHAR_SANDER_01', kind: 'character', name: 'Sander', role: 'Hovedperson · tømrer', look: 'sander',
+      attrs: { 'Alder': '47', 'Bygning': 'kraftig, 1,85 m', 'Hår': 'kort, gråsprængt', 'Skæg': 'fuldskæg, gråt',
+        'Hovedbeklædning': 'mørkegrå flat cap', 'Overdel': 'marineblå arbejdsjakke', 'Underdel': 'sorte arbejdsbukser', 'Kendetegn': 'blyant bag højre øre' },
+      rules: [
+        { attr: 'Hovedbeklædning', re: /((?:blå|rød|sort|hvid|grøn|gul)e?\s)?(baseballkasket|kasket|strikhue|hue|cowboyhat|hat)\b/i },
+        { attr: 'Overdel', re: /((?:rød|grøn|gul|orange|hvid)e?\s)(jakke|skjorte|trøje|hættetrøje)\b/i },
+      ] },
+    { id: 'a_holm', code: 'CHAR_HOLM_01', kind: 'character', name: 'Fru Holm', role: 'Kunden', look: 'holm',
+      attrs: { 'Alder': '74', 'Hår': 'lyst gråt, sat op i knold', 'Overdel': 'lilla cardigan', 'Briller': 'guldstel', 'Væremåde': 'venlig, men har altid én ting mere' },
+      rules: [{ attr: 'Hår', re: /\b(langt|kort|sort|rødt|blondt)\s(hår)\b/i }] },
+    { id: 'a_per', code: 'CHAR_PER_01', kind: 'character', name: 'Per', role: 'Naboen', look: 'per',
+      attrs: { 'Alder': '58', 'Hår': 'brunt, tyndt', 'Overdel': 'grøn strik', 'Væremåde': 'snakkesalig' }, rules: [] },
+    { id: 'a_villavej', code: 'LOC_VILLAVEJ_01', kind: 'location', name: 'Villavejen', role: 'Sanders første kunde', look: 'villavej',
+      attrs: { 'Arkitektur': "gule murstens-rækkehuse fra 60'erne", 'Tid på dagen': 'morgen, kl. 7.30', 'Lys': 'overskyet, blødt',
+        'Vejr': 'tørt, efterår', 'Farvepalet': 'gul mursten, grå asfalt, mørkegrønne hække', 'Kendetegn': 'hvid postkasse ved nr. 14' },
+      rules: [{ attr: 'Vejr', re: /\b(regn|sne|solskin|tåge)\b/i }] },
+    { id: 'a_koekken', code: 'LOC_KOEKKEN_01', kind: 'location', name: 'Fru Holms køkken', role: 'Interiør', look: 'koekken',
+      attrs: { 'Arkitektur': "70'er-køkken i teak", 'Tid på dagen': 'eftermiddag', 'Lys': 'lavt sollys fra vinduet', 'Farvepalet': 'teak, mintgrønne fliser, hvidt køleskab' }, rules: [] },
+    { id: 'a_vanloc', code: 'LOC_VAREVOGN_01', kind: 'location', name: 'I varevognen', role: 'Førerhus', look: 'varevogn',
+      attrs: { 'Arkitektur': 'førerhus i Sanders varevogn', 'Tid på dagen': 'aften', 'Lys': 'gadelys gennem forruden', 'Farvepalet': 'mørkegrå, varm gul' }, rules: [] },
+    { id: 'a_van', code: 'VEH_VAN_01', kind: 'vehicle', name: 'Sanders varevogn', role: 'Køretøj', look: 'van',
+      attrs: { 'Model': 'hvid kassevogn, 2019', 'Logo': 'SANDER · TØMRER, blå tekst', 'Stand': 'lidt snavset, bulet bagdør' }, rules: [] },
+    { id: 'a_phone', code: 'PROP_TELEFON_01', kind: 'prop', name: 'Sanders telefon', role: 'Prop', look: 'phone',
+      attrs: { 'Udseende': 'sort, revnet skærm i øverste hjørne' }, rules: [] },
+    { id: 'a_note', code: 'PROP_SEDDEL_01', kind: 'prop', name: 'Fru Holms huskeseddel', role: 'Prop', look: 'note',
+      attrs: { 'Udseende': 'gul seddel, håndskrevet med kuglepen', 'Tekst': 'hængsel · lampe · vandhane · maling' }, rules: [] },
+  ];
+}
+
+function shotTemplates() {
+  // [kode, scene, varighed, type, linse, bevægelse, handling, replik, noter, aktiver (id:version), lys]
+  const S = (code, scene, dur, type, lens, move, action, dialogue, notes, assets, lighting, frameReq = true) =>
+    ({ id: 's_' + code.slice(5), code, scene, duration: dur, camera: { type, lens, move }, action, dialogue, notes, lighting,
+      assets: assets.map((a) => { const [id, v] = a.split(':'); return { id, v: Number(v || 1), pinned: false }; }),
+      frameReq, deviations: [], frame: { versions: [], approved: null }, video: { versions: [], approved: null } });
+  return [
+    S('SHOT_01', 'sc1', 5, 'wide', 24, 'static', 'Sander går hen mod varevognen med værktøjskassen.', '', '', ['a_sander', 'a_villavej', 'a_van'], 'overskyet morgenlys'),
+    S('SHOT_02', 'sc1', 6, 'medium_closeup', 85, 'optical_zoom', 'Sander ser ind i kameraet.', 'Jeg skal bare lige skifte et dørhængsel. Ti minutter.', '', ['a_sander', 'a_villavej', 'a_van'], 'overskyet morgenlys'),
+    S('SHOT_03', 'sc1', 3, 'insert', 50, 'static', 'Telefonen ringer. På skærmen står "Fru Holm".', '', '', ['a_phone'], 'overskyet morgenlys'),
+    S('SHOT_04', 'sc1', 5, 'medium', 35, 'handheld', 'Sander tager telefonen og nikker opgivende.', '', '', ['a_sander', 'a_villavej', 'a_van'], 'overskyet morgenlys'),
+    S('SHOT_05', 'sc2', 6, 'wide', 28, 'static', 'Fru Holm viser Sander det løse dørhængsel.', '', '', ['a_sander', 'a_holm', 'a_koekken'], 'lavt eftermiddagslys'),
+    S('SHOT_06', 'sc2', 4, 'closeup', 85, 'static', 'Fru Holm smiler forsigtigt.', 'Og når du nu er her … lampen i gangen blinker også.', '', ['a_holm', 'a_koekken'], 'lavt eftermiddagslys'),
+    S('SHOT_07', 'sc2', 6, 'medium_closeup', 85, 'optical_zoom', 'Sander ser ind i kameraet og venter.', '', 'Sander har en blå baseballkasket på og ser træt ud.', ['a_sander', 'a_koekken'], 'lavt eftermiddagslys'),
+    S('SHOT_08', 'sc2', 4, 'insert', 50, 'static', 'Huskesedlen på køleskabet: hængsel, lampe, vandhane, maling.', '', '', ['a_note', 'a_koekken'], 'lavt eftermiddagslys'),
+    S('SHOT_09', 'sc3', 5, 'wide', 24, 'pan', 'Naboen Per vinker Sander over hækken.', '', '', ['a_sander', 'a_per', 'a_villavej'], 'gråt eftermiddagslys'),
+    S('SHOT_10', 'sc3', 4, 'medium', 35, 'handheld', 'Sander bærer en stige hen over vejen.', '', '', ['a_sander', 'a_villavej'], 'gråt eftermiddagslys'),
+    S('SHOT_11', 'sc4', 6, 'medium', 35, 'static', 'Sander sætter sig ind i varevognen og sukker.', '', '', ['a_sander', 'a_vanloc'], 'gadelys'),
+    S('SHOT_12', 'sc4', 6, 'closeup', 85, 'optical_zoom', 'Sander ser ind i kameraet og smiler træt.', 'Ti minutter.', '', ['a_sander', 'a_vanloc'], 'gadelys'),
+  ];
+}
+
+const SCENES = [
+  { id: 'sc1', n: 1, heading: 'Villavejen, morgen', purpose: 'Etablerer Sander og hans plan: ti minutter.' },
+  { id: 'sc2', n: 2, heading: 'Fru Holms køkken', purpose: 'Én opgave bliver til fire.' },
+  { id: 'sc3', n: 3, heading: 'Villavejen, eftermiddag', purpose: 'Naboen vil også lige have hjælp.' },
+  { id: 'sc4', n: 4, heading: 'I varevognen, aften', purpose: 'Pointen: ti minutter.' },
+];
+
+let uid = 100;
+const nextId = (p) => `${p}_${++uid}`;
+const now = () => Date.now();
+
+function mkVersion(n, status, extra = {}) { return { n, status, seed: n * 7 + Math.floor(Math.random() * 5), comment: '', provider: '', ...extra }; }
+
+function assetFromTemplate(t, status = 'draft') {
+  const roles = REF_ROLES[t.kind];
+  return {
+    id: t.id, code: t.code, kind: t.kind, name: t.name, role: t.role, look: t.look, rules: t.rules,
+    consent: t.kind === 'character' ? t.id === 'a_sander' : null,
+    master: status === 'approved' ? 1 : null,
+    versions: [{ v: 1, status, attrs: { ...t.attrs }, note: '',
+      refs: status === 'draft' ? {} : Object.fromEntries(roles.slice(0, roles.length - (t.kind === 'character' ? 1 : 0)).map(([r]) => [r, { src: 'gen' }])) }],
+  };
+}
+
+function buildSanderProject() {
+  const assets = {};
+  for (const t of assetTemplates()) assets[t.id] = assetFromTemplate(t, 'approved');
+  // Fru Holm har en master-version, men Per er kun en kladde, og førerhuset venter på dig.
+  assets.a_per = assetFromTemplate(assetTemplates().find((t) => t.id === 'a_per'), 'draft');
+  const vl = assets.a_vanloc; vl.master = null; vl.versions[0].status = 'needs_approval';
+  // Varevognen har fået nyt logo: v2 er master, og shots på v1 er forældede.
+  const van = assets.a_van;
+  van.versions.push({ v: 2, status: 'approved', attrs: { ...van.versions[0].attrs, 'Logo': 'SANDER TØMRER & SNEDKER, orange stribe' }, note: 'Nyt firmalogo', refs: { side: { src: 'gen' }, front: { src: 'gen' }, logo: { src: 'gen' } } });
+  van.master = 2;
+
+  const shots = {};
+  for (const s of shotTemplates()) shots[s.id] = s;
+  const set = (id, fn) => fn(shots[id]);
+  set('s_02', (s) => { s.assets.find((a) => a.id === 'a_van').v = 2; });
+  set('s_04', (s) => { s.assets.find((a) => a.id === 'a_van').v = 2; });
+
+  const F = (s, list) => { s.frame.versions = list.map(([st, extra], i) => mkVersion(i + 1, st, { provider: 'Billedmodel A', ...(extra || {}) })); const ok = s.frame.versions.find((v) => v.status === 'approved'); s.frame.approved = ok ? ok.n : null; };
+  const V = (s, list) => { s.video.versions = list.map(([st, extra], i) => mkVersion(i + 1, st, { provider: 'Videomodel A', ...(extra || {}) })); const ok = s.video.versions.find((v) => v.status === 'approved'); s.video.approved = ok ? ok.n : null; };
+  F(shots.s_01, [['approved']]); V(shots.s_01, [['approved']]);
+  F(shots.s_02, [['rejected', { comment: 'Sander ser for ung ud.' }], ['approved']]); V(shots.s_02, [['needs_approval']]);
+  F(shots.s_03, [['approved']]); V(shots.s_03, [['generating']]);
+  F(shots.s_04, [['approved']]); V(shots.s_04, [['failed']]);
+  F(shots.s_05, [['needs_approval']]);
+  F(shots.s_06, [['generating']]);
+  F(shots.s_08, [['rejected', { comment: 'Sedlen skal være håndskrevet, ikke printet.' }]]);
+
+  const p = {
+    id: 'p_sander', title: 'Sander bliver afbrudt', created: 'for 3 dage siden',
+    idea: { ...SANDER_IDEA }, ideaStatus: 'approved',
+    brief: { status: 'approved', version: 1, content: { ...SANDER_BRIEF } },
+    storyboard: { status: 'approved', version: 2 },
+    scenes: SCENES.map((s) => ({ ...s })), shots, assets,
+    budget: { limit: 500, spent: 212 },
+    jobs: [],
+  };
+  const J = (shotId, slot, n, status, provider, extra = {}) => p.jobs.push({ id: nextId('job'), target: { type: 'shot', id: shotId, slot, n }, status, provider, cost: PRICE[slot === 'frame' ? 'frame' : 'video'], at: extra.at || 'i dag', attempts: extra.attempts || [{ provider, result: 'ok' }] });
+  J('s_01', 'frame', 1, 'done', 'Billedmodel A', { at: 'i går' });
+  J('s_01', 'video', 1, 'done', 'Videomodel A', { at: 'i går' });
+  J('s_02', 'frame', 2, 'done', 'Billedmodel A', { at: 'i går' });
+  J('s_02', 'video', 1, 'done', 'Videomodel A');
+  J('s_03', 'video', 1, 'generating', 'Videomodel A');
+  J('s_04', 'video', 1, 'failed', 'Videomodel B', { attempts: [
+    { provider: 'Videomodel A', result: 'bad', text: 'Intet svar efter 10 min. Jobbet annulleret, og stop bekræftet.' },
+    { provider: 'Videomodel B', result: 'bad', text: 'Overbelastet (503). Ingen flere providere med image-to-video.' }] });
+  J('s_05', 'frame', 1, 'done', 'Billedmodel A');
+  J('s_06', 'frame', 1, 'generating', 'Billedmodel A');
+  p.jobs.push({ id: nextId('job'), target: { type: 'asset', id: 'a_vanloc', slot: 'master', n: 1 }, status: 'done', provider: 'Billedmodel B', cost: PRICE.master, at: 'i dag', attempts: [{ provider: 'Billedmodel B', result: 'ok' }] });
+  return p;
+}
+
+function buildEmptyProject(idea) {
+  return {
+    id: nextId('p'), title: idea.title, created: 'lige nu',
+    idea, ideaStatus: 'draft',
+    brief: { status: 'draft', version: 0, content: null },
+    storyboard: { status: 'draft', version: 0 },
+    scenes: [], shots: {}, assets: {},
+    budget: { limit: 500, spent: 0 }, jobs: [],
+  };
+}
+
+/* =====================================================================
+   Tilstand
+   ===================================================================== */
+const STORE_KEY = 'afs-prototype-v1';
+let S;
+function freshState() {
+  const p = buildSanderProject();
+  return { view: 'projects', pid: null, shotId: null, assetId: null, sbMode: 'grid', assetTab: 'assets', assetFilter: 'all',
+    projects: { [p.id]: p }, order: [p.id], draftIdea: null, sheet: null, toasts: [], playing: null, frameSel: null, videoSel: null };
+}
+function load() {
+  try { const raw = localStorage.getItem(STORE_KEY); if (raw) { const st = JSON.parse(raw); reviveRules(st); st.sheet = null; st.toasts = []; st.playing = null; return st; } } catch (e) { /* ingen lagring */ }
+  return freshState();
+}
+function reviveRules(st) {
+  const byId = Object.fromEntries(assetTemplates().map((t) => [t.id, t.rules]));
+  for (const p of Object.values(st.projects)) for (const a of Object.values(p.assets)) a.rules = byId[a.id] || [];
+}
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(S, (k, v) => (v instanceof RegExp ? undefined : v))); } catch (e) { /* ingen lagring */ }
+}
+S = load();
+
+const P = () => S.projects[S.pid];
+
+/* =====================================================================
+   Afledte statusser
+   ===================================================================== */
+const latest = (slot) => slot.versions[slot.versions.length - 1] || null;
+const assetLatest = (a) => a.versions[a.versions.length - 1];
+const assetMasterV = (a) => (a.master ? a.versions.find((v) => v.v === a.master) : null);
+function assetStatus(a) { return assetLatest(a).status; }
+
+function staleRefs(p, s) {
+  return s.assets.filter((r) => { const a = p.assets[r.id]; return a && a.master && r.v < a.master && !r.pinned; });
+}
+function conflicts(p, s) {
+  const text = `${s.action} ${s.notes}`;
+  const out = [];
+  for (const r of s.assets) {
+    const a = p.assets[r.id]; if (!a) continue;
+    const ver = a.versions.find((v) => v.v === r.v) || assetLatest(a);
+    for (const rule of a.rules || []) {
+      const m = text.match(rule.re);
+      if (!m) continue;
+      const dev = s.deviations.find((d) => d.assetId === a.id && d.attr === rule.attr);
+      out.push({ assetId: a.id, assetName: a.name, code: a.code, attr: rule.attr, master: ver.attrs[rule.attr], shot: m[0].trim(), match: m[0], allowed: !!dev });
+    }
+  }
+  return out;
+}
+const openConflicts = (p, s) => conflicts(p, s).filter((c) => !c.allowed);
+
+function frameStatus(p, s) {
+  const v = latest(s.frame);
+  if (!v) return 'draft';
+  if (v.status === 'approved' && staleRefs(p, s).length) return 'outdated';
+  return v.status;
+}
+function videoStatus(p, s) {
+  const v = latest(s.video);
+  if (!v) return 'draft';
+  if ((v.status === 'approved' || v.status === 'needs_approval') && (staleRefs(p, s).length || frameStatus(p, s) !== 'approved')) return 'outdated';
+  return v.status;
+}
+
+function frameGates(p, s) {
+  const gates = [];
+  gates.push({ ok: p.storyboard.status === 'approved', text: 'Storyboardet er godkendt' });
+  const unapproved = s.assets.map((r) => p.assets[r.id]).filter((a) => !a.master);
+  gates.push({ ok: unapproved.length === 0, text: unapproved.length ? `Mangler godkendt master: ${unapproved.map((a) => a.name).join(', ')}` : 'Alle aktiver har en godkendt master' });
+  const stale = staleRefs(p, s);
+  gates.push({ ok: stale.length === 0, text: stale.length ? `Bygger på en gammel version: ${stale.map((r) => p.assets[r.id].name + ' v' + r.v).join(', ')}` : 'Aktiver er på nyeste master (eller bevidst fastholdt)' });
+  const oc = openConflicts(p, s);
+  gates.push({ ok: oc.length === 0, text: oc.length ? `${oc.length} kontinuitetskonflikt skal afklares` : 'Ingen kontinuitetskonflikter' });
+  return gates;
+}
+function videoGates(p, s) {
+  const fs = frameStatus(p, s);
+  return [
+    { ok: fs === 'approved', text: fs === 'approved' ? 'Startframe er godkendt' : 'Kræver en godkendt startframe' },
+    ...frameGates(p, s).slice(1),
+  ];
+}
+const gatesOk = (g) => g.every((x) => x.ok);
+
+function agg(list) {
+  if (!list.length) return 'draft';
+  for (const st of ['failed', 'needs_approval', 'generating', 'outdated', 'rejected']) if (list.includes(st)) return st;
+  if (list.every((x) => x === 'approved')) return 'approved';
+  return 'draft';
+}
+
+function journey(p) {
+  const shots = Object.values(p.shots);
+  const chars = Object.values(p.assets).filter((a) => a.kind === 'character').map(assetStatus);
+  const locs = Object.values(p.assets).filter((a) => a.kind === 'location').map(assetStatus);
+  const ready = shots.filter((s) => gatesOk(frameGates(p, s)) || frameStatus(p, s) !== 'draft');
+  const shotStates = shots.map((s) => (staleRefs(p, s).length ? 'outdated' : openConflicts(p, s).length ? 'needs_approval' : gatesOk(frameGates(p, s)) ? 'approved' : 'draft'));
+  const frames = shots.filter((s) => s.frameReq).map((s) => frameStatus(p, s));
+  const frameGen = frames.map((f) => (f === 'needs_approval' || f === 'approved' ? 'approved' : f));
+  const frameAppr = frames.map((f) => (f === 'generating' ? 'draft' : f));
+  const vids = shots.map((s) => videoStatus(p, s));
+  const vidGen = vids.map((f) => (f === 'needs_approval' || f === 'approved' ? 'approved' : f));
+  const vidAppr = vids.map((f) => (f === 'generating' ? 'draft' : f === 'failed' ? 'draft' : f));
+  const cnt = (arr, st) => arr.filter((x) => x === st).length;
+  return [
+    { key: 'idea', t: 'Idé', status: p.ideaStatus, c: p.ideaStatus === 'approved' ? 'udfyldt' : 'mangler', view: 'idea' },
+    { key: 'brief', t: 'Film Brief', status: p.brief.status, c: p.brief.version ? 'v' + p.brief.version : '—', view: 'brief' },
+    { key: 'storyboard', t: 'Storyboard', status: p.storyboard.status, c: p.storyboard.version ? `v${p.storyboard.version} · ${shots.length} shots` : '—', view: 'storyboard' },
+    { key: 'characters', t: 'Karakterer', status: chars.length ? agg(chars) : 'draft', c: `${cnt(chars, 'approved')}/${chars.length} godkendt`, view: 'characters' },
+    { key: 'locations', t: 'Locations', status: locs.length ? agg(locs) : 'draft', c: `${cnt(locs, 'approved')}/${locs.length} godkendt`, view: 'locations' },
+    { key: 'shots', t: 'Shots', status: shots.length ? agg(shotStates) : 'draft', c: `${ready.length}/${shots.length} klar`, view: 'storyboard' },
+    { key: 'frames', t: 'Startframes', status: frames.length ? agg(frameGen) : 'draft', c: `${frames.length - cnt(frames, 'draft')}/${frames.length} lavet`, view: 'queue' },
+    { key: 'approval', t: 'Godkendelse', status: frames.length ? agg(frameAppr) : 'draft', c: `${cnt(frames, 'approved')}/${frames.length} godkendt`, view: 'approvals' },
+    { key: 'video', t: 'Video', status: shots.length ? agg(vidGen) : 'draft', c: `${vids.length - cnt(vids, 'draft')}/${vids.length} lavet`, view: 'queue' },
+    { key: 'vapproval', t: 'Video godkendt', status: shots.length ? agg(vidAppr) : 'draft', c: `${cnt(vids, 'approved')}/${vids.length} godkendt`, view: 'approvals' },
+  ];
+}
+
+function pendingApprovals(p) {
+  const items = [];
+  if (p.brief.status === 'needs_approval') items.push({ type: 'brief', title: 'Film Brief v' + p.brief.version, sub: p.title });
+  if (p.storyboard.status === 'needs_approval') items.push({ type: 'storyboard', title: 'Storyboard v' + p.storyboard.version, sub: `${Object.keys(p.shots).length} shots · ${totalSec(p)} sek.` });
+  for (const a of Object.values(p.assets)) if (assetStatus(a) === 'needs_approval') items.push({ type: 'asset', id: a.id, title: `${a.name} v${assetLatest(a).v}`, sub: `${KIND[a.kind].label} · master-referencer` });
+  for (const s of Object.values(p.shots)) {
+    if (frameStatus(p, s) === 'needs_approval') items.push({ type: 'frame', id: s.id, title: `${s.code} · startframe v${latest(s.frame).n}`, sub: s.action });
+    if (videoStatus(p, s) === 'needs_approval') items.push({ type: 'video', id: s.id, title: `${s.code} · video v${latest(s.video).n}`, sub: `${s.duration} sek. · ${MOVES[s.camera.move]}` });
+  }
+  return items;
+}
+function decisions(p) {
+  const items = [];
+  for (const s of Object.values(p.shots)) {
+    for (const c of openConflicts(p, s)) items.push({ type: 'conflict', id: s.id, title: `${s.code} · ${c.attr}`, sub: `Master: ${c.master} — shot: ${c.shot}` });
+    for (const r of staleRefs(p, s)) items.push({ type: 'stale', id: s.id, title: `${s.code} · ${p.assets[r.id].name}`, sub: `Bygger på v${r.v} — master er nu v${p.assets[r.id].master}` });
+  }
+  return items;
+}
+const totalSec = (p) => Object.values(p.shots).reduce((a, s) => a + s.duration, 0);
+const runningJobs = (p) => p.jobs.filter((j) => j.status === 'queued' || j.status === 'generating');
+
+/* =====================================================================
+   Tegninger (simulerede stillframes)
+   ===================================================================== */
+const PAL = {
+  sander: { skin: '#e2b08f', top: '#23324f', bottom: '#1c1c1f', hair: '#8c8883', cap: '#40444b', beard: '#a19b93' },
+  holm: { skin: '#efc6a8', top: '#9d86bd', bottom: '#565266', hair: '#d9d4cd', glasses: '#b8923a' },
+  per: { skin: '#e6b995', top: '#4d7a52', bottom: '#384658', hair: '#6d4e33' },
+};
+function figure(who, cx, foot, h, opt = {}) {
+  const c = PAL[who]; if (!c) return '';
+  const hr = h * 0.09, headY = foot - h + hr;
+  const shoulderW = h * (who === 'holm' ? 0.24 : 0.28), torsoTop = headY + hr * 1.05, torsoH = h * 0.36, legTop = torsoTop + torsoH;
+  let g = '';
+  g += `<rect x="${cx - shoulderW * 0.36}" y="${legTop}" width="${shoulderW * 0.3}" height="${foot - legTop}" rx="${h * 0.02}" fill="${c.bottom}"/>`;
+  g += `<rect x="${cx + shoulderW * 0.06}" y="${legTop}" width="${shoulderW * 0.3}" height="${foot - legTop}" rx="${h * 0.02}" fill="${c.bottom}"/>`;
+  g += `<rect x="${cx - shoulderW / 2}" y="${torsoTop}" width="${shoulderW}" height="${torsoH + h * 0.03}" rx="${h * 0.05}" fill="${c.top}"/>`;
+  const armY = torsoTop + h * 0.02;
+  g += `<rect x="${cx - shoulderW / 2 - h * 0.06}" y="${armY}" width="${h * 0.075}" height="${torsoH * 0.95}" rx="${h * 0.035}" fill="${c.top}"/>`;
+  g += `<rect x="${cx + shoulderW / 2 - h * 0.015}" y="${armY}" width="${h * 0.075}" height="${torsoH * 0.95}" rx="${h * 0.035}" fill="${c.top}"/>`;
+  if (who === 'sander') g += `<rect x="${cx - h * 0.012}" y="${torsoTop + h * 0.02}" width="${h * 0.024}" height="${torsoH * 0.9}" fill="#16213a"/>`;
+  g += `<rect x="${cx - hr * 0.45}" y="${headY + hr * 0.7}" width="${hr * 0.9}" height="${hr * 0.6}" fill="${c.skin}"/>`;
+  g += `<circle cx="${cx}" cy="${headY}" r="${hr}" fill="${c.skin}"/>`;
+  if (who === 'sander') {
+    g += `<path d="M ${cx - hr * 0.95} ${headY + hr * 0.05} Q ${cx} ${headY + hr * 1.55} ${cx + hr * 0.95} ${headY + hr * 0.05} L ${cx + hr * 0.7} ${headY + hr * 0.35} Q ${cx} ${headY + hr * 0.75} ${cx - hr * 0.7} ${headY + hr * 0.35} Z" fill="${c.beard}"/>`;
+    const capCol = opt.capOverride || c.cap;
+    g += `<path d="M ${cx - hr * 1.02} ${headY - hr * 0.2} Q ${cx - hr * 0.9} ${headY - hr * 1.15} ${cx + hr * 0.2} ${headY - hr * 1.02} Q ${cx + hr * 1.1} ${headY - hr * 0.9} ${cx + hr * 1.35} ${headY - hr * 0.25} Z" fill="${capCol}"/>`;
+    g += `<rect x="${cx + hr * 0.62}" y="${headY - hr * 0.1}" width="${hr * 0.12}" height="${hr * 0.55}" transform="rotate(-25 ${cx + hr * 0.68} ${headY})" fill="#d9a441"/>`;
+  } else if (who === 'holm') {
+    g += `<path d="M ${cx - hr * 1.02} ${headY} Q ${cx - hr} ${headY - hr * 1.1} ${cx} ${headY - hr * 1.05} Q ${cx + hr} ${headY - hr * 1.1} ${cx + hr * 1.02} ${headY} Q ${cx + hr * 0.6} ${headY - hr * 0.55} ${cx} ${headY - hr * 0.6} Q ${cx - hr * 0.6} ${headY - hr * 0.55} ${cx - hr * 1.02} ${headY} Z" fill="${c.hair}"/>`;
+    g += `<circle cx="${cx}" cy="${headY - hr * 1.15}" r="${hr * 0.42}" fill="${c.hair}"/>`;
+    g += `<g fill="none" stroke="${c.glasses}" stroke-width="${Math.max(0.6, hr * 0.07)}"><circle cx="${cx - hr * 0.38}" cy="${headY + hr * 0.02}" r="${hr * 0.26}"/><circle cx="${cx + hr * 0.38}" cy="${headY + hr * 0.02}" r="${hr * 0.26}"/></g>`;
+  } else {
+    g += `<path d="M ${cx - hr} ${headY - hr * 0.1} Q ${cx} ${headY - hr * 1.3} ${cx + hr} ${headY - hr * 0.1} Q ${cx} ${headY - hr * 0.65} ${cx - hr} ${headY - hr * 0.1} Z" fill="${c.hair}"/>`;
+  }
+  const eyeR = Math.max(0.5, hr * 0.08);
+  g += `<circle cx="${cx - hr * 0.36}" cy="${headY + hr * 0.02}" r="${eyeR}" fill="#23201e"/><circle cx="${cx + hr * 0.36}" cy="${headY + hr * 0.02}" r="${eyeR}" fill="#23201e"/>`;
+  if (opt.wave) g += `<rect x="${cx + shoulderW / 2}" y="${armY - h * 0.28}" width="${h * 0.07}" height="${h * 0.3}" rx="${h * 0.035}" fill="${c.top}"/>`;
+  return g;
+}
+function van(x, y, w, v2) {
+  const h = w * 0.5;
+  let g = `<rect x="${x}" y="${y}" width="${w * 0.72}" height="${h}" rx="${w * 0.03}" fill="#f1f1ee" stroke="#c9c9c3"/>`;
+  g += `<path d="M ${x + w * 0.72} ${y + h * 0.18} L ${x + w * 0.9} ${y + h * 0.3} Q ${x + w} ${y + h * 0.45} ${x + w} ${y + h * 0.7} L ${x + w} ${y + h} L ${x + w * 0.72} ${y + h} Z" fill="#ecece8" stroke="#c9c9c3"/>`;
+  g += `<path d="M ${x + w * 0.74} ${y + h * 0.26} L ${x + w * 0.88} ${y + h * 0.34} Q ${x + w * 0.95} ${y + h * 0.44} ${x + w * 0.96} ${y + h * 0.52} L ${x + w * 0.74} ${y + h * 0.52} Z" fill="#97aac0"/>`;
+  if (v2) g += `<rect x="${x}" y="${y + h * 0.62}" width="${w * 0.72}" height="${h * 0.1}" fill="#e8742c"/>`;
+  g += `<text x="${x + w * 0.36}" y="${y + h * 0.42}" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="${w * 0.055}" fill="${v2 ? '#b8541a' : '#1f4e8c'}">${v2 ? 'SANDER TØMRER &amp; SNEDKER' : 'SANDER · TØMRER'}</text>`;
+  for (const wx of [x + w * 0.17, x + w * 0.82]) g += `<circle cx="${wx}" cy="${y + h}" r="${w * 0.08}" fill="#222"/><circle cx="${wx}" cy="${y + h}" r="${w * 0.035}" fill="#8a8a8a"/>`;
+  return g;
+}
+function bg(look, seed = 0, tone = 0) {
+  const j = (seed % 5) * 3;
+  if (look === 'villavej') {
+    let g = `<defs><linearGradient id="sky${seed}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c3ccd7"/><stop offset="1" stop-color="#e9ecef"/></linearGradient></defs>`;
+    g += `<rect width="320" height="180" fill="url(#sky${seed})"/>`;
+    for (let i = 0; i < 5; i++) {
+      const x = -20 + i * 72 + j;
+      g += `<rect x="${x}" y="58" width="66" height="72" fill="${i % 2 ? '#d7b36a' : '#cfa95e'}"/><path d="M ${x - 4} 60 L ${x + 33} 34 L ${x + 70} 60 Z" fill="#5a4944"/>`;
+      g += `<rect x="${x + 8}" y="74" width="16" height="16" fill="#eef1f3"/><rect x="${x + 40}" y="74" width="16" height="16" fill="#eef1f3"/><rect x="${x + 26}" y="100" width="14" height="30" fill="#6b5143"/>`;
+    }
+    g += `<rect x="0" y="118" width="320" height="16" fill="#355e3b"/><rect x="0" y="134" width="320" height="12" fill="#b9bbbd"/><rect x="0" y="146" width="320" height="34" fill="#6d7177"/>`;
+    g += `<rect x="236" y="112" width="10" height="22" fill="#f4f4f4"/>`;
+    if (tone) g += `<rect width="320" height="180" fill="#1b2340" opacity="0.18"/>`;
+    return g;
+  }
+  if (look === 'koekken') {
+    let g = `<rect width="320" height="180" fill="#e8dfcb"/>`;
+    g += `<rect x="30" y="22" width="84" height="64" fill="#fff4cf"/><rect x="30" y="22" width="84" height="64" fill="none" stroke="#8a6a4a" stroke-width="4"/><line x1="72" y1="22" x2="72" y2="86" stroke="#8a6a4a" stroke-width="3"/>`;
+    for (let x = 0; x < 320; x += 12) for (let y = 92; y < 118; y += 12) g += `<rect x="${x + 1}" y="${y + 1}" width="10" height="10" fill="#bfe0d2"/>`;
+    g += `<rect x="0" y="118" width="250" height="8" fill="#efe9dd"/><rect x="0" y="126" width="250" height="54" fill="#8b6848"/>`;
+    for (let x = 10; x < 250; x += 60) g += `<rect x="${x}" y="134" width="50" height="40" fill="none" stroke="#6e5037" stroke-width="2"/>`;
+    g += `<rect x="256" y="30" width="58" height="150" rx="4" fill="#f6f6f2" stroke="#d6d6cf"/><rect x="262" y="80" width="46" height="2" fill="#d6d6cf"/>`;
+    g += `<rect x="272" y="46" width="22" height="26" fill="#f6dd62" transform="rotate(4 283 59)"/>`;
+    g += `<polygon points="0,0 140,0 60,180 0,180" fill="#fff6d0" opacity="0.18"/>`;
+    return g;
+  }
+  if (look === 'varevogn') {
+    let g = `<rect width="320" height="180" fill="#23262d"/>`;
+    g += `<path d="M 30 20 L 290 20 L 270 100 L 50 100 Z" fill="#2f3a52"/>`;
+    for (let i = 0; i < 4; i++) g += `<rect x="${70 + i * 50}" y="${56 - (i % 2) * 6}" width="34" height="${44 + (i % 2) * 6}" fill="#3b3f4a"/><rect x="${78 + i * 50}" y="64" width="8" height="8" fill="#f2c96b"/>`;
+    g += `<circle cx="250" cy="34" r="6" fill="#f7d58a" opacity="0.9"/>`;
+    g += `<rect x="0" y="100" width="320" height="80" fill="#17191d"/><rect x="0" y="100" width="320" height="6" fill="#2b2e35"/>`;
+    g += `<circle cx="96" cy="150" r="34" fill="none" stroke="#0e0f12" stroke-width="9"/>`;
+    g += `<rect width="320" height="180" fill="#f2b84b" opacity="0.06"/>`;
+    return g;
+  }
+  return `<rect width="320" height="180" fill="#e9ebef"/>`;
+}
+function propArt(look) {
+  if (look === 'phone') return `<rect x="104" y="18" width="112" height="170" rx="16" fill="#18191c"/><rect x="112" y="30" width="96" height="150" rx="8" fill="#2c6bd8"/><path d="M 180 30 L 208 60 L 204 30 Z" fill="#dfe8f7" opacity=".7"/><path d="M 186 36 L 200 52" stroke="#fff" stroke-width="1.2"/><text x="160" y="92" text-anchor="middle" font-family="Arial" font-size="15" font-weight="700" fill="#fff">Fru Holm</text><text x="160" y="110" text-anchor="middle" font-family="Arial" font-size="10" fill="#dbe6fb">ringer …</text><circle cx="138" cy="150" r="11" fill="#e0443e"/><circle cx="182" cy="150" r="11" fill="#39b25d"/>`;
+  if (look === 'note') return `<rect x="84" y="16" width="152" height="156" fill="#f6dd62" transform="rotate(3 160 94)"/><g transform="rotate(3 160 94)" font-family="'Segoe Print','Bradley Hand',cursive" font-size="17" fill="#26304a"><text x="104" y="54">hængsel</text><text x="104" y="84">lampe</text><text x="104" y="114">vandhane</text><text x="104" y="144">maling!</text></g>`;
+  return '';
+}
+
+const FRAMING = { extreme_wide: { h: 40, head: null }, wide: { h: 64, head: null }, medium: { h: 190, head: 55 }, medium_closeup: { h: 280, head: 60 }, closeup: { h: 430, head: 82 } };
+function sceneSVG(p, s, seed = 1, opt = {}) {
+  const refs = s.assets.map((r) => ({ ...r, a: p.assets[r.id] })).filter((r) => r.a);
+  const loc = refs.find((r) => r.a.kind === 'location');
+  const chars = refs.filter((r) => r.a.kind === 'character');
+  const veh = refs.find((r) => r.a.kind === 'vehicle');
+  const prop = refs.find((r) => r.a.kind === 'prop');
+  let g = bg(loc ? loc.a.look : '', seed, s.lighting.includes('eftermiddag') && loc && loc.a.look === 'villavej' ? 1 : 0);
+  if (s.camera.type === 'insert' && prop) {
+    g += `<rect width="320" height="180" fill="#000" opacity="0.25"/>` + propArt(prop.a.look);
+  } else {
+    const fr = FRAMING[s.camera.type] || FRAMING.medium;
+    if (veh && (s.camera.type === 'wide' || s.camera.type === 'extreme_wide')) g += van(150 + (seed % 3) * 6, 92, 150, veh.v >= 2);
+    else if (veh && s.camera.type === 'medium') g += van(170, 40, 260, veh.v >= 2);
+    else if (veh && s.camera.type === 'medium_closeup') g += `<rect x="236" y="30" width="120" height="150" fill="#f1f1ee"/>${veh.v >= 2 ? '<rect x="236" y="120" width="120" height="16" fill="#e8742c"/>' : ''}`;
+    const capOverride = opt.capOverride;
+    const n = chars.length;
+    chars.forEach((c, i) => {
+      const cx = n === 1 ? (s.camera.type === 'wide' ? 110 + (seed % 3) * 8 : 150 + (seed % 3) * 5) : 90 + i * (140 / Math.max(1, n - 1)) + (seed % 3) * 4;
+      const h = fr.h;
+      const foot = fr.head == null ? 150 : fr.head + h - h * 0.09;
+      g += figure(c.a.look, cx, foot, h, { capOverride: c.a.look === 'sander' ? capOverride : null, wave: c.a.look === 'per' });
+    });
+    if (s.lighting.includes('eftermiddag') && loc && loc.a.look === 'koekken') g += `<rect width="320" height="180" fill="#ffcc66" opacity="0.07"/>`;
+  }
+  return `<svg class="scene" viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${esc(s.code)}">${g}</svg>`;
+}
+function assetSVG(a, role, seed = 1, v = 1) {
+  const look = a.look;
+  if (a.kind === 'character') {
+    const ratio = '0 0 200 250';
+    const bgc = role === 'clothing' ? '#e6e8ec' : '#eceef1';
+    let g = `<rect width="200" height="250" fill="${bgc}"/>`;
+    if (role === 'full_body') g += figure(look, 100, 236, 210);
+    else if (role === 'clothing') g += figure(look, 100, 330, 330);
+    else if (role === 'profile') g += `<g transform="translate(200 0) scale(-1 1)">${figure(look, 112, 470, 470)}</g>`;
+    else g += figure(look, 100, 470, 470);
+    return `<svg viewBox="${ratio}" preserveAspectRatio="xMidYMid slice">${g}</svg>`;
+  }
+  if (a.kind === 'vehicle') {
+    let g = `<rect width="320" height="180" fill="#e3e6ea"/><rect y="140" width="320" height="40" fill="#b9bcc1"/>`;
+    g += role === 'logo' ? van(-60, 20, 380, v >= 2) : van(40 + (seed % 3) * 4, 60, 240, v >= 2);
+    return `<svg viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice">${g}</svg>`;
+  }
+  if (a.kind === 'prop') return `<svg viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice"><rect width="320" height="180" fill="#dfe2e7"/><g transform="${role === 'detail' ? 'translate(-160 -60) scale(2)' : ''}">${propArt(look)}</g></svg>`;
+  return `<svg viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice">${bg(look, seed + (role === 'detail' ? 2 : 0), role === 'light' ? 1 : 0)}</svg>`;
+}
+
+/* =====================================================================
+   Hjælpere til HTML
+   ===================================================================== */
+function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
+const pill = (st, text) => `<span class="pill ${st}">${esc(text || ST[st] || st)}</span>`;
+const kr = (n) => `${n.toLocaleString('da-DK')} kr.`;
+function chip(p, r, opts = {}) {
+  const a = p.assets[r.id]; if (!a) return '';
+  const stale = a.master && r.v < a.master && !r.pinned;
+  const notReady = !a.master;
+  return `<button class="chip ${stale ? 'stale' : notReady ? 'warn' : ''}" data-act="openAsset" data-id="${a.id}" title="${esc(a.code)}"><span class="k">${KIND[a.kind].code}</span>${esc(a.name)}<span class="v">v${r.v}${r.pinned ? ' 📌' : ''}</span></button>`;
+}
+function frameBox(p, s, which = 'frame', n = null, opts = {}) {
+  const slot = s[which];
+  const v = n ? slot.versions.find((x) => x.n === n) : (slot.approved ? slot.versions.find((x) => x.n === slot.approved) : latest(slot));
+  const st = which === 'frame' ? frameStatus(p, s) : videoStatus(p, s);
+  let inner = '';
+  if (!v) inner = `<div class="empty">${which === 'frame' ? (s.frameReq ? 'Ingen startframe endnu' : 'Tekst-til-video') : 'Ingen video endnu'}</div>`;
+  else if (v.status === 'generating') inner = `<div class="shimmer">Genererer …</div>`;
+  else if (v.status === 'failed') inner = sceneSVG(p, s, v.seed) + `<div class="shimmer" style="background:var(--st-fail-bg);color:var(--st-fail);animation:none">Fejlet</div>`;
+  else {
+    const capOverride = s.id === 's_07' && openConflicts(p, s).length === 0 && s.deviations.length ? '#2f5fae' : null;
+    inner = sceneSVG(p, s, v.seed, { capOverride });
+    if (which === 'video') inner += `<button class="playbtn" data-act="play" data-id="${s.id}" aria-label="Afspil ${esc(s.code)}"><svg viewBox="0 0 16 16"><path d="M4 2 L14 8 L4 14 Z" fill="#fff"/></svg></button>`;
+  }
+  const playing = S.playing === s.id && which === 'video';
+  const dim = v && v.status === 'rejected' && !opts.noDim;
+  return `<div class="frame ${dim ? 'dim' : ''} ${playing ? 'playing m-' + s.camera.move : ''}" style="--dur:${s.duration}s">${inner}${opts.tc !== false ? `<span class="tc">${which === 'video' ? '▶ ' : ''}00:0${Math.min(9, s.duration)}</span>` : ''}${opts.over ? `<div class="over">${opts.over}</div>` : ''}</div>`;
+}
+function gateList(g) { return `<div class="stack tight">${g.map((x) => `<div class="gate ${x.ok ? 'ok' : 'no'}"><span class="ic">${x.ok ? '✓' : '×'}</span><span>${esc(x.text)}</span></div>`).join('')}</div>`; }
+function avatar(a) {
+  const mv = assetMasterV(a) || assetLatest(a);
+  const role = REF_ROLES[a.kind][0][0];
+  const ref = mv.refs[role];
+  if (ref && ref.src === 'upload') return `<div class="avatar"><img alt="" src="${ref.data}"></div>`;
+  if (!ref && !a.master) return `<div class="avatar" style="display:grid;place-items:center;color:var(--faint);font-family:var(--mono);font-size:10px">${KIND[a.kind].code}</div>`;
+  return `<div class="avatar">${assetSVG(a, role, 1, mv.v)}</div>`;
+}
+
+/* =====================================================================
+   Visninger
+   ===================================================================== */
+const NAV = [
+  { group: 'Planlægning', items: [['overview', 'Overblik', ''], ['idea', 'Idé', '1'], ['brief', 'Film Brief', '2'], ['storyboard', 'Storyboard', '3']] },
+  { group: 'Aktiver', items: [['characters', 'Karakterer', '4'], ['locations', 'Locations', '5'], ['assets', 'Aktiver og referencer', '']] },
+  { group: 'Produktion', items: [['approvals', 'Godkendelser', ''], ['queue', 'Produktionskø', '']] },
+];
+
+function render() {
+  const active = document.activeElement;
+  const keep = active && active.id ? { id: active.id, s: active.selectionStart, e: active.selectionEnd } : null;
+  const root = document.getElementById('root');
+  const p = S.pid ? P() : null;
+  let body = '';
+  try { body = p ? projectView(p) : S.view === 'new' ? viewNew() : viewProjects(); }
+  catch (err) { body = `<div class="notice fail">Prototypen løb ind i en fejl: ${esc(err.message)} <button class="btn sm" data-act="reset">Nulstil demo</button></div>`; console.error(err); }
+  root.innerHTML = `<div class="app">${topbar(p)}${p ? sidenav(p) : '<nav class="sidenav" aria-label="Hovedmenu"><div class="navgroup"><div class="label">Studie</div><button class="navitem active" data-act="home"><span class="grow">Film</span></button></div></nav>'}<main>${body}</main>${p ? statusbar(p) : '<div class="statusbar"><span class="muted">Prototype · AI-svar og billeder er simulerede med Sander-eksempeldata. Intet sendes til nogen AI-provider.</span></div>'}</div>${sheet()}${toasts()}`;
+  if (keep) { const el = document.getElementById(keep.id); if (el) { el.focus(); try { if (keep.s != null) el.setSelectionRange(keep.s, keep.e); } catch (e) { /* ikke tekstfelt */ } } }
+  save();
+}
+
+function topbar(p) {
+  return `<header class="topbar">
+    <button class="brand" data-act="home"><span class="brand-mark"><svg viewBox="0 0 16 16"><rect x="1" y="5" width="14" height="10" rx="1.5" fill="#fff"/><path d="M1 5 L3.5 1.5 L6.5 1.5 L4 5 M6.5 5 L9 1.5 L12 1.5 L9.5 5" stroke="#fff" stroke-width="1.4" fill="none"/></svg></span>AI Film Studio</button>
+    ${p ? `<div class="crumb"><span>/</span><strong>${esc(p.title)}</strong></div>` : ''}
+    <div class="spacer"></div>
+    <span class="proto-tag">Prototype · simulerede AI-svar</span>
+    <button class="btn sm" data-act="reset" title="Starter demoen forfra">Nulstil demo</button>
+  </header>`;
+}
+
+function sidenav(p) {
+  const appr = pendingApprovals(p).length + decisions(p).length;
+  const run = runningJobs(p).length;
+  const js = Object.fromEntries(journey(p).map((j) => [j.view + (j.key === 'shots' ? 's' : ''), j.status]));
+  const dotFor = (v) => { const st = { idea: p.ideaStatus, brief: p.brief.status, storyboard: p.storyboard.status, characters: js.characters, locations: js.locations }[v]; return st ? `<span class="pill bare ${st}" title="${ST[st]}" style="font-size:0"></span>` : ''; };
+  return `<nav class="sidenav" aria-label="Projektmenu">${NAV.map((g) => `<div class="navgroup"><div class="label">${g.group}</div>${g.items.map(([v, t, n]) => {
+    const on = S.view === v || (S.view === 'shot' && v === 'storyboard') || (S.view === 'asset' && ((v === 'characters' && P().assets[S.assetId]?.kind === 'character') || (v === 'locations' && P().assets[S.assetId]?.kind === 'location') || (v === 'assets' && !['character', 'location'].includes(P().assets[S.assetId]?.kind))));
+    const extra = v === 'approvals' && appr ? `<span class="badge">${appr}</span>` : v === 'queue' && run ? `<span class="badge gen">${run}</span>` : dotFor(v);
+    return `<button class="navitem ${on ? 'active' : ''}" data-act="nav" data-view="${v}"><span class="step">${n}</span><span class="grow">${t}</span>${extra}</button>`;
+  }).join('')}</div>`).join('')}</nav>`;
+}
+
+function statusbar(p) {
+  const shots = Object.values(p.shots);
+  const fa = shots.filter((s) => frameStatus(p, s) === 'approved').length;
+  const vg = shots.filter((s) => ['needs_approval', 'approved', 'outdated'].includes(videoStatus(p, s))).length;
+  const va = shots.filter((s) => videoStatus(p, s) === 'approved').length;
+  const pend = pendingApprovals(p).length + decisions(p).length;
+  const run = runningJobs(p).length;
+  const sep = '<span class="sep">·</span>';
+  return `<div class="statusbar"><span><b>${shots.length}</b> shots</span>${sep}<span><b>${fa}</b> startframes godkendt</span>${sep}<span><b>${vg}</b> videoer genereret</span>${sep}<span><b>${va}</b> godkendt</span>${sep}<span style="color:var(--st-need)"><b>${pend}</b> venter på dig</span>${run ? `${sep}<span style="color:var(--st-gen)"><b>${run}</b> genererer</span>` : ''}<span class="grow"></span><span class="muted">Budget ${kr(p.budget.spent)} af ${kr(p.budget.limit)}</span></div>`;
+}
+
+function projectView(p) {
+  switch (S.view) {
+    case 'idea': return viewIdea(p);
+    case 'brief': return viewBrief(p);
+    case 'storyboard': return viewStoryboard(p);
+    case 'characters': return viewAssetKind(p, 'character');
+    case 'locations': return viewAssetKind(p, 'location');
+    case 'asset': return viewAssetKind(p, p.assets[S.assetId] ? p.assets[S.assetId].kind : 'character');
+    case 'assets': return viewAssets(p);
+    case 'shot': return viewShot(p);
+    case 'approvals': return viewApprovals(p);
+    case 'queue': return viewQueue(p);
+    default: return viewOverview(p);
+  }
+}
+
+/* ---------- Film (projektliste) ---------- */
+function viewProjects() {
+  const list = S.order.map((id) => S.projects[id]);
+  return `<div class="pagehead"><div><h1>Dine film</h1><p class="sub">Hver film følger samme rejse — fra idé til godkendt video. Du godkender hvert trin, før det næste bygger videre på det.</p></div><button class="btn primary" data-act="newProject">+ Ny film</button></div>
+  <div class="stack">${list.map((p) => {
+    const j = journey(p);
+    const first = Object.values(p.shots).find((s) => latest(s.frame) && latest(s.frame).status === 'approved');
+    const pend = pendingApprovals(p).length + decisions(p).length;
+    return `<button class="projcard" data-act="openProject" data-id="${p.id}">
+      ${first ? frameBox(p, first, 'frame', null, { tc: false }) : `<div class="frame"><div class="empty">Ingen billeder endnu</div></div>`}
+      <div class="stack tight">
+        <div class="row between"><h2>${esc(p.title)}</h2>${pend ? `<span class="pill needs_approval">${pend} venter på dig</span>` : ''}</div>
+        <p class="muted">${esc(p.idea.idea)}</p>
+        <div class="minijourney" aria-label="Rejse">${j.map((x) => `<i class="${x.status}" title="${esc(x.t)}: ${ST[x.status]}"></i>`).join('')}</div>
+        <div class="row small muted"><span>${Object.keys(p.shots).length} shots</span><span>·</span><span>${Object.values(p.assets).length} aktiver</span><span>·</span><span>${totalSec(p) || p.idea.duration} sek.</span><span>·</span><span>oprettet ${esc(p.created)}</span></div>
+      </div></button>`;
+  }).join('')}</div>
+  <div class="card" style="margin-top:20px"><div class="row between"><h3>Statusser</h3><span class="small muted">Bruges ens overalt: brief, storyboard, aktiver, startframes og video</span></div><div class="legend" style="margin-top:10px">${STATUS_ORDER.map((s) => pill(s)).join('')}</div></div>`;
+}
+
+function viewNew() {
+  const d = S.draftIdea;
+  return `<div class="pagehead"><div><span class="label">Trin 1 af 10 · Idé</span><h1 style="margin-top:4px">Ny film</h1><p class="sub">Beskriv idéen. Instruktøren bruger svarene til at foreslå et Film Brief, som du godkender, før storyboardet laves.</p></div></div>
+  ${ideaForm(d, 'createProject', 'Opret film og foreslå brief')}`;
+}
+function ideaForm(d, act, label, locked) {
+  const dis = locked ? 'disabled' : '';
+  return `<form class="card pad-lg stack" data-form="${act}">
+    <div class="formgrid">
+      <label class="field full">Arbejdstitel<input type="text" id="f_title" data-bind="title" value="${esc(d.title)}" ${dis}></label>
+      <label class="field full">Hvad handler filmen om?<textarea id="f_idea" rows="3" data-bind="idea" ${dis}>${esc(d.idea)}</textarea></label>
+      <label class="field full">Hvad er budskabet?<textarea id="f_message" rows="2" data-bind="message" ${dis}>${esc(d.message)}</textarea></label>
+      <label class="field">Hvem er målgruppen?<input type="text" id="f_audience" data-bind="audience" value="${esc(d.audience)}" ${dis}></label>
+      <label class="field">Hvad skal seeren føle eller forstå?<input type="text" id="f_feeling" data-bind="feeling" value="${esc(d.feeling)}" ${dis}></label>
+      <label class="field">Længde<span class="hint">sekunder</span><input type="number" id="f_duration" min="10" max="600" data-bind="duration" value="${esc(d.duration)}" ${dis}></label>
+      <label class="field">Stil<select id="f_style" data-bind="style" ${dis}>${['Mockumentary', 'Dokumentar', 'Reklame', 'Komedie', 'Drama', 'Animation'].map((s) => `<option ${s === d.style ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+    </div>
+    ${locked ? `<div class="notice info"><span>🔒</span><div class="grow"><p>Idéen er låst, fordi briefet er godkendt.</p><p class="muted small">I MVP 1: en ændring laver et nyt brief (v2), og alt nedstrøms bliver markeret som forældet — intet slettes.</p></div></div>` : `<div class="row"><button class="btn primary" type="submit">${label}</button>${act === 'createProject' ? '<button class="btn" type="button" data-act="home">Fortryd</button>' : ''}</div>`}
+  </form>`;
+}
+
+/* ---------- Overblik ---------- */
+function nextStep(p) {
+  const pend = pendingApprovals(p), dec = decisions(p);
+  if (p.brief.status === 'draft') return { text: 'Lad instruktøren foreslå et Film Brief ud fra idéen.', act: 'nav', view: 'idea', btn: 'Gå til idé' };
+  if (p.brief.status === 'generating') return { text: 'Instruktøren skriver briefet …' };
+  if (p.brief.status === 'needs_approval' || p.brief.status === 'rejected') return { text: 'Briefet venter på din godkendelse.', act: 'nav', view: 'brief', btn: 'Læs briefet' };
+  if (p.storyboard.status === 'draft') return { text: 'Briefet er godkendt. Lad instruktøren foreslå storyboard, karakterer og locations.', act: 'nav', view: 'storyboard', btn: 'Gå til storyboard' };
+  if (p.storyboard.status === 'generating') return { text: 'Instruktøren tegner storyboardet …' };
+  if (p.storyboard.status === 'needs_approval') return { text: 'Storyboardet venter på din godkendelse.', act: 'nav', view: 'storyboard', btn: 'Gennemgå storyboard' };
+  const noMaster = Object.values(p.assets).filter((a) => !a.master && assetStatus(a) === 'draft');
+  if (pend.length) return { text: `${pend.length} ting venter på din godkendelse.`, act: 'nav', view: 'approvals', btn: 'Åbn godkendelser' };
+  if (dec.length) return { text: `${dec.length} shots kræver et valg (kontinuitet eller forældede aktiver).`, act: 'nav', view: 'approvals', btn: 'Se hvilke' };
+  if (noMaster.length) return { text: `${noMaster.map((a) => a.name).join(', ')} mangler en godkendt master, før deres shots kan produceres.`, act: 'openAsset', id: noMaster[0].id, btn: `Åbn ${noMaster[0].name}` };
+  const ready = Object.values(p.shots).filter((s) => frameStatus(p, s) === 'draft' && gatesOk(frameGates(p, s)));
+  if (ready.length) return { text: `${ready.length} shots er klar til startframes.`, act: 'batchFrames', btn: `Generér ${ready.length} startframes · ca. ${kr(ready.length * PRICE.frame)}` };
+  const vready = Object.values(p.shots).filter((s) => videoStatus(p, s) === 'draft' && s.video.versions.length === 0 && gatesOk(videoGates(p, s)));
+  if (vready.length) return { text: `${vready.length} shots har godkendt startframe og er klar til video.`, act: 'openShot', id: vready[0].id, btn: `Åbn ${vready[0].code}` };
+  if (runningJobs(p).length) return { text: 'Produktionen kører. Du får besked, når noget venter på dig.', act: 'nav', view: 'queue', btn: 'Se produktionskø' };
+  return { text: 'Alt, der kan produceres lige nu, er produceret.' };
+}
+function viewOverview(p) {
+  const j = journey(p), n = nextStep(p);
+  const shots = Object.values(p.shots);
+  const chars = Object.values(p.assets).filter((a) => a.kind === 'character').length;
+  const locs = Object.values(p.assets).filter((a) => a.kind === 'location').length;
+  return `<div class="pagehead"><div><span class="label">Overblik</span><h1 style="margin-top:4px">${esc(p.title)}</h1><p class="sub">${esc(p.brief.content ? p.brief.content.logline : p.idea.idea)}</p></div></div>
+  <div class="stack">
+    <div class="card flush"><div class="journey">${j.map((x, i) => `<button class="jstep" data-act="nav" data-view="${x.view}"><span class="bar ${x.status}"></span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${x.t}</span>${pill(x.status)}<span class="c">${esc(x.c)}</span></button>`).join('')}</div></div>
+    <div class="card pad-lg"><div class="row between top"><div class="stack tight grow"><span class="label">Næste skridt</span><p style="font-size:16px">${esc(n.text)}</p></div>${n.btn ? `<button class="btn primary" data-act="${n.act}" data-view="${n.view || ''}" data-id="${n.id || ''}">${esc(n.btn)}</button>` : ''}</div></div>
+    <div class="kpis">
+      <div class="kpi"><span class="label">Længde</span><b>${totalSec(p) || p.idea.duration} sek.</b><span class="small muted">${shots.length} shots i ${p.scenes.length} scener</span></div>
+      <div class="kpi"><span class="label">Karakterer</span><b>${chars}</b><span class="small muted">${locs} locations</span></div>
+      <div class="kpi"><span class="label">Venter på dig</span><b style="color:var(--st-need)">${pendingApprovals(p).length + decisions(p).length}</b><span class="small muted">godkendelser og valg</span></div>
+      <div class="kpi"><span class="label">Budget</span><b>${kr(p.budget.spent)}</b><span class="small muted">af ${kr(p.budget.limit)} til billeder og video</span></div>
+    </div>
+    ${shots.length ? `<div class="card"><div class="section-title"><h2>Storyboard</h2><button class="btn ghost" data-act="nav" data-view="storyboard">Åbn storyboard →</button></div><div class="shotgrid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${shots.map((s) => `<button class="vcard" data-act="openShot" data-id="${s.id}">${frameBox(p, s, 'frame', null, { over: pill(frameStatus(p, s)) })}<span class="shotcode">${s.code}</span></button>`).join('')}</div></div>` : ''}
+  </div>`;
+}
+
+/* ---------- Idé ---------- */
+function viewIdea(p) {
+  const locked = p.brief.status === 'approved';
+  const d = S.draftIdea && S.draftIdea.pid === p.id ? S.draftIdea : { ...p.idea, pid: p.id };
+  if (!S.draftIdea || S.draftIdea.pid !== p.id) S.draftIdea = d;
+  const gen = p.brief.status === 'generating';
+  return `<div class="pagehead"><div><span class="label">Trin 1 · Idé</span><h1 style="margin-top:4px">Idé</h1><p class="sub">Grundlaget for briefet. Alt, instruktøren foreslår, skal kunne føres tilbage til disse svar.</p></div>${pill(p.ideaStatus === 'approved' ? 'approved' : 'draft', p.ideaStatus === 'approved' ? 'Udfyldt' : 'Kladde')}</div>
+  ${gen ? `<div class="notice info" style="margin-bottom:16px"><span class="pill generating">Genererer</span><div class="grow">Instruktøren skriver briefet …</div></div>` : ''}
+  ${ideaForm(d, 'generateBrief', p.brief.version ? `Foreslå nyt brief (v${p.brief.version + 1})` : 'Foreslå Film Brief', locked || gen)}`;
+}
+
+/* ---------- Brief ---------- */
+function viewBrief(p) {
+  const b = p.brief;
+  if (!b.content && b.status !== 'generating') return `<div class="pagehead"><div><span class="label">Trin 2 · Film Brief</span><h1 style="margin-top:4px">Film Brief</h1></div>${pill('draft')}</div><div class="card pad-lg stack"><p>Der er intet brief endnu. Beskriv idéen, så foreslår instruktøren et.</p><button class="btn primary" data-act="nav" data-view="idea">Gå til idé</button></div>`;
+  if (b.status === 'generating') return `<div class="pagehead"><div><span class="label">Trin 2 · Film Brief</span><h1 style="margin-top:4px">Film Brief</h1></div>${pill('generating')}</div><div class="card pad-lg"><div class="shimmer" style="position:relative;height:160px;border-radius:10px">Instruktøren skriver briefet ud fra dine svar …</div></div>`;
+  const c = b.content;
+  return `<div class="pagehead"><div><span class="label">Trin 2 · Film Brief · v${b.version}</span><h1 style="margin-top:4px">${esc(p.title)}</h1><p class="sub" style="font-size:16px;color:var(--ink)">${esc(c.logline)}</p></div>${pill(b.status)}</div>
+  <div class="cols">
+    <div class="card pad-lg stack">
+      <dl class="facts">
+        <dt>Budskab</dt><dd>${esc(c.message)}</dd><dt>Målgruppe</dt><dd>${esc(c.audience)}</dd><dt>Følelse</dt><dd>${esc(c.feeling)}</dd>
+        <dt>Længde</dt><dd>${c.duration} sek.</dd><dt>Stil</dt><dd>${esc(c.style)}</dd><dt>Tone</dt><dd>${esc(c.tone)}</dd><dt>Visuel retning</dt><dd>${esc(c.visual)}</dd>
+      </dl>
+      <div class="divider"></div>
+      <h3>Nøgleøjeblikke</h3><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px">${c.moments.map((m) => `<li>${esc(m)}</li>`).join('')}</ol>
+      ${c.questions.length ? `<div class="notice warn"><span>?</span><div class="grow"><p><b>Instruktøren har valgt for dig her</b></p>${c.questions.map((q) => `<p>${esc(q)}</p>`).join('')}</div></div>` : ''}
+    </div>
+    <div class="stack">
+      ${b.status === 'needs_approval' ? `<div class="card stack"><h2>Din beslutning</h2><p class="muted">Storyboardet kan først laves, når briefet er godkendt.</p><div class="row"><button class="btn approve" data-act="approveBrief">Godkend brief</button><button class="btn reject" data-act="rejectBrief">Afvis og ret idéen</button></div></div>` : ''}
+      ${b.status === 'approved' ? `<div class="notice ok"><span>✓</span><div class="grow"><p>Godkendt. Storyboard, karakterer og locations bygger på denne version.</p></div></div>` : ''}
+      ${b.status === 'rejected' ? `<div class="notice fail"><span>×</span><div class="grow"><p>Afvist. Ret idéen, og lad instruktøren foreslå et nyt brief.</p><button class="btn sm" style="margin-top:8px" data-act="nav" data-view="idea">Ret idéen</button></div></div>` : ''}
+      <div class="card stack tight"><span class="label">Stilbibel</span><p class="small">${esc(STYLE_BIBLE)}</p><p class="small muted">Indgår i alle billed- og videoprompts, så filmen hænger visuelt sammen.</p></div>
+    </div>
+  </div>`;
+}
+
+/* ---------- Storyboard ---------- */
+function viewStoryboard(p) {
+  const sb = p.storyboard;
+  const head = `<div class="pagehead"><div><span class="label">Trin 3 · Storyboard${sb.version ? ' · v' + sb.version : ''} · sandhedskilden</span><h1 style="margin-top:4px">Storyboard</h1><p class="sub">Hvert shot er en produktionsenhed: det ved, hvilke karakterer, locations og køretøjer det bruger — og i hvilken version.</p></div>`;
+  if (p.brief.status !== 'approved') return head + `${pill('locked', 'Låst')}</div><div class="card pad-lg stack"><p>Storyboardet laves ud fra et godkendt brief.</p><button class="btn" data-act="nav" data-view="brief">Gå til brief</button></div>`;
+  if (sb.status === 'draft') return head + `${pill('draft')}</div><div class="card pad-lg stack"><h2>Klar til storyboard</h2><p class="muted">Instruktøren foreslår scener og shots ud fra det godkendte brief, og trækker samtidig karakterer, locations, køretøjer og props ud som aktiver, du godkender hver for sig.</p><div><button class="btn primary" data-act="generateStoryboard">Foreslå storyboard og aktiver</button></div></div>`;
+  if (sb.status === 'generating') return head + `${pill('generating')}</div><div class="card pad-lg"><div class="shimmer" style="position:relative;height:200px;border-radius:10px">Instruktøren tegner storyboardet og finder aktiverne …</div></div>`;
+  const shots = Object.values(p.shots);
+  const ready = shots.filter((s) => frameStatus(p, s) === 'draft' && gatesOk(frameGates(p, s)));
+  const head2 = head + `<div class="row">${pill(sb.status)}<div class="seg" role="tablist"><button class="${S.sbMode === 'grid' ? 'on' : ''}" data-act="sbMode" data-mode="grid">Gitter</button><button class="${S.sbMode === 'table' ? 'on' : ''}" data-act="sbMode" data-mode="table">Tabel</button></div></div></div>`;
+  let top = '';
+  if (sb.status === 'needs_approval') top = `<div class="notice warn" style="margin-bottom:16px"><span>!</span><div class="grow"><p><b>Storyboard v${sb.version} venter på din godkendelse.</b> ${shots.length} shots · ${totalSec(p)} sek. · ${Object.keys(p.assets).length} aktiver fundet.</p></div><button class="btn approve sm" data-act="approveStoryboard">Godkend storyboard</button><button class="btn reject sm" data-act="rejectStoryboard">Afvis</button></div>`;
+  else if (ready.length) top = `<div class="notice info" style="margin-bottom:16px"><span>→</span><div class="grow"><p>${ready.length} shots har alt, hvad de skal bruge, og er klar til startframes.</p></div><button class="btn primary sm" data-act="batchFrames">Generér ${ready.length} startframes <span class="cost">ca. ${kr(ready.length * PRICE.frame)}</span></button></div>`;
+  const body = S.sbMode === 'table' ? sbTable(p) : p.scenes.map((sc) => {
+    const list = shots.filter((s) => s.scene === sc.id);
+    return `<section class="scene-block"><div class="scene-head"><span class="code">SCENE ${String(sc.n).padStart(2, '0')}</span><h2>${esc(sc.heading)}</h2><span class="muted">${esc(sc.purpose)}</span><span class="grow"></span><span class="mono muted">${list.reduce((a, s) => a + s.duration, 0)} sek.</span></div>
+      <div class="shotgrid">${list.map((s) => shotCard(p, s)).join('')}</div></section>`;
+  }).join('');
+  return head2 + top + `<div class="stack" style="gap:26px">${body}</div>`;
+}
+function shotCard(p, s) {
+  const fs = frameStatus(p, s), vs = videoStatus(p, s);
+  const stale = staleRefs(p, s).length, oc = openConflicts(p, s).length;
+  return `<div class="shotcard ${stale ? 'is-old' : oc ? 'is-warn' : ''}" data-act="openShot" data-id="${s.id}" role="button" tabindex="0">
+    ${frameBox(p, s, 'frame')}
+    <div class="meta"><span class="shotcode">${s.code}</span><span class="mono muted" style="white-space:nowrap">${s.duration} sek. · ${SHOT_TYPES[s.camera.type]}</span></div>
+    <p class="action">${esc(s.action)}</p>
+    <div class="chips">${s.assets.map((r) => chip(p, r)).join('')}</div>
+    <div class="slotrow"><span class="k">Startframe</span><span>${pill(fs)}</span><span class="k">Video</span><span>${pill(vs)}</span></div>
+    ${oc ? `<div class="small" style="color:var(--st-need)">⚠ Kontinuitetskonflikt</div>` : ''}
+  </div>`;
+}
+function sbTable(p) {
+  const shots = Object.values(p.shots);
+  const names = (s, kind) => s.assets.filter((r) => p.assets[r.id] && p.assets[r.id].kind === kind).map((r) => chip(p, r)).join(' ') || '<span class="faint">—</span>';
+  return `<div class="card flush tablewrap"><table class="data"><thead><tr><th>Shot</th><th>Frame</th><th>Karakterer</th><th>Location</th><th>Køretøj / props</th><th>Kamera</th><th>Sek.</th><th>Startframe</th><th>Video</th></tr></thead><tbody>
+  ${shots.map((s) => `<tr class="click" data-act="openShot" data-id="${s.id}"><td class="shotcode">${s.code}</td><td class="thumb">${frameBox(p, s, 'frame', null, { tc: false })}</td><td>${names(s, 'character')}</td><td>${names(s, 'location')}</td><td>${[names(s, 'vehicle'), names(s, 'prop')].filter((x) => !x.includes('—')).join(' ') || '<span class="faint">—</span>'}</td><td class="small">${SHOT_TYPES[s.camera.type]}<br><span class="mono muted">${s.camera.lens} mm · ${MOVES[s.camera.move]}</span></td><td class="mono">${s.duration}</td><td>${pill(frameStatus(p, s))}</td><td>${pill(videoStatus(p, s))}</td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+
+/* ---------- Karakterer / Locations (studio) ---------- */
+function viewAssetKind(p, kind) {
+  const list = Object.values(p.assets).filter((a) => a.kind === kind);
+  const cur = S.view === 'asset' && p.assets[S.assetId] && p.assets[S.assetId].kind === kind ? p.assets[S.assetId] : list[0];
+  const title = kind === 'character' ? 'Character Studio' : kind === 'location' ? 'Location Studio' : KIND[kind].plural;
+  const step = kind === 'character' ? 'Trin 4 · Karakterer' : kind === 'location' ? 'Trin 5 · Locations' : 'Aktiver';
+  const head = `<div class="pagehead"><div><span class="label">${step}</span><h1 style="margin-top:4px">${title}</h1><p class="sub">${kind === 'character' ? 'En karakter har én godkendt master, som alle shots bruger. Systemet ændrer den aldrig selv — en ændring er en ny version.' : kind === 'location' ? 'En location husker arkitektur, tid på dagen, lys, vejr og farver, så instruktøren ikke opfinder en ny gade i hvert shot.' : 'Genbrugelige produktionsaktiver.'}</p></div><button class="btn" data-act="newAsset" data-kind="${kind}">+ Ny ${KIND[kind].label.toLowerCase()}</button></div>`;
+  if (!list.length) return head + `<div class="card pad-lg stack"><p>Ingen ${KIND[kind].plural.toLowerCase()} endnu.</p><p class="muted">Når storyboardet er foreslået, finder instruktøren dem i manuskriptet. Du kan også oprette dem selv.</p>${p.storyboard.status === 'draft' && p.brief.status === 'approved' ? '<div><button class="btn primary" data-act="nav" data-view="storyboard">Gå til storyboard</button></div>' : ''}</div>`;
+  return head + `<div class="cols side"><div class="assetlist">${list.map((a) => `<button class="assetrow ${cur && a.id === cur.id ? 'on' : ''}" data-act="openAsset" data-id="${a.id}">${avatar(a)}<div class="grow"><div style="font-weight:600">${esc(a.name)}</div><div class="mono faint">${a.code}</div></div>${pill(assetStatus(a))}</button>`).join('')}</div>
+  ${cur ? assetDetail(p, cur) : ''}</div>`;
+}
+function usage(p, a) { return Object.values(p.shots).filter((s) => s.assets.some((r) => r.id === a.id)); }
+function assetDetail(p, a) {
+  const selV = S.assetV && S.assetV.id === a.id ? a.versions.find((v) => v.v === S.assetV.v) : null;
+  const ver = selV || assetLatest(a);
+  const editable = ver.status === 'draft' || ver.status === 'rejected';
+  const used = usage(p, a);
+  const roles = REF_ROLES[a.kind];
+  const wide = a.kind !== 'character';
+  const onOld = used.filter((s) => s.assets.some((r) => r.id === a.id && a.master && r.v < a.master && !r.pinned));
+  let action = '';
+  if (ver.status === 'draft' || ver.status === 'rejected') action = a.kind === 'character' && !a.consent ? `<div class="notice warn"><span>!</span><div class="grow"><p>Bruges der fotos af en rigtig person, skal der ligge et samtykke, før de må bruges til generering.</p><button class="btn sm" style="margin-top:8px" data-act="consent" data-id="${a.id}">Samtykke foreligger</button></div></div>` : `<button class="btn primary" data-act="genMaster" data-id="${a.id}" data-v="${ver.v}">Generér master-referencer <span class="cost">ca. ${kr(PRICE.master)}</span></button>`;
+  else if (ver.status === 'generating') action = pill('generating', 'Genererer master-referencer …');
+  else if (ver.status === 'needs_approval') action = `<div class="row"><button class="btn approve" data-act="approveAsset" data-id="${a.id}" data-v="${ver.v}">Godkend som master</button><button class="btn reject" data-act="rejectAsset" data-id="${a.id}" data-v="${ver.v}">Afvis</button></div>`;
+  else if (ver.status === 'approved' && a.master !== ver.v) action = `<button class="btn" data-act="makeMaster" data-id="${a.id}" data-v="${ver.v}">Gør v${ver.v} til master</button>`;
+  else if (ver.status === 'approved') action = `<button class="btn" data-act="newVersion" data-id="${a.id}">Lav ny version (v${assetLatest(a).v + 1})</button>`;
+  return `<div class="card pad-lg stack">
+    <div class="row between top"><div class="stack tight"><div class="row"><h2 style="font-size:20px">${esc(a.name)}</h2>${pill(ver.status)}${a.master === ver.v ? '<span class="pill approved" style="background:none;border:1px solid currentColor">Master</span>' : ''}</div><div class="row small muted"><span class="mono">${a.code}</span><span>·</span><span>${esc(a.role)}</span><span>·</span><span>bruges i ${used.length} shots</span></div></div>
+    <div class="versions">${a.versions.map((v) => `<button class="vtab ${v.v === ver.v ? 'on' : ''}" data-act="selAssetV" data-id="${a.id}" data-v="${v.v}">v${v.v}${a.master === v.v ? '<span class="star">MASTER</span>' : ''}<span class="pill bare ${v.status}" style="font-size:0"></span></button>`).join('')}</div></div>
+    ${onOld.length && a.master === ver.v ? `<div class="notice old"><span>↻</span><div class="grow"><p><b>${onOld.length} shots bygger stadig på en ældre version:</b> ${onOld.map((s) => s.code).join(', ')}. De er markeret som forældede, indtil du vælger at opdatere eller bevidst beholde den gamle version.</p></div></div>` : ''}
+    <div><div class="section-title"><h3>Referencer</h3><span class="small muted">${ver.status === 'approved' ? 'Låst — godkendt version' : 'Upload egne billeder eller generér'}</span></div>
+    <div class="refgrid" style="${wide ? 'grid-template-columns:repeat(auto-fill,minmax(170px,1fr))' : ''}">${roles.map(([r, label]) => {
+      const ref = ver.refs[r];
+      let box;
+      if (ref && ref.src === 'upload') box = `<div class="frame"><img alt="${esc(label)}" src="${ref.data}"></div>`;
+      else if (ref) box = `<div class="frame">${assetSVG(a, r, ver.v, ver.v)}</div>`;
+      else if (ver.status === 'generating') box = `<div class="frame"><div class="shimmer">Genererer …</div></div>`;
+      else if (editable) box = `<div class="frame"><label class="uploadbtn">+ Upload<br>${esc(label.toLowerCase())}<input type="file" accept="image/*" data-upload="${a.id}" data-v="${ver.v}" data-role="${r}"></label></div>`;
+      else box = `<div class="frame"><div class="empty">Ingen</div></div>`;
+      return `<div class="refslot ${wide ? 'wide' : ''}">${box}<div class="cap"><span>${esc(label)}</span><span class="faint">${ref ? (ref.src === 'upload' ? 'upload' : 'genereret') : ''}</span></div></div>`;
+    }).join('')}</div></div>
+    <div><div class="section-title"><h3>Identitet</h3><span class="small muted">${editable ? 'Rediger før generering' : 'Bruges ordret i alle prompts'}</span></div>
+    <div class="attrtable">${Object.entries(ver.attrs).map(([k, v]) => `<div class="k">${esc(k)}</div><div>${editable ? `<input type="text" id="attr_${a.id}_${ver.v}_${k.replace(/\W/g, '')}" data-attr="${esc(k)}" data-aid="${a.id}" data-v="${ver.v}" value="${esc(v)}">` : esc(v)}</div>`).join('')}</div></div>
+    ${ver.note ? `<p class="small muted">Ændring i denne version: ${esc(ver.note)}</p>` : ''}
+    <div>${action}</div>
+    <div><div class="section-title"><h3>Bruges i</h3></div><div class="chips">${used.map((s) => { const r = s.assets.find((x) => x.id === a.id); return `<button class="chip ${a.master && r.v < a.master && !r.pinned ? 'stale' : ''}" data-act="openShot" data-id="${s.id}"><span class="k">SHOT</span>${s.code.slice(5)}<span class="v">v${r.v}</span></button>`; }).join('') || '<span class="muted">Ingen shots endnu</span>'}</div></div>
+  </div>`;
+}
+
+/* ---------- Aktiver og referencer ---------- */
+function viewAssets(p) {
+  const all = Object.values(p.assets);
+  const list = S.assetFilter === 'all' ? all : all.filter((a) => a.kind === S.assetFilter);
+  const tabs = `<div class="seg"><button class="${S.assetTab === 'assets' ? 'on' : ''}" data-act="assetTab" data-tab="assets">Aktiver</button><button class="${S.assetTab === 'refs' ? 'on' : ''}" data-act="assetTab" data-tab="refs">Referencebilleder</button></div>`;
+  const filters = `<div class="row">${[['all', 'Alle'], ...Object.entries(KIND).map(([k, v]) => [k, v.plural])].map(([k, t]) => `<button class="btn sm ${S.assetFilter === k ? 'primary' : ''}" data-act="assetFilter" data-f="${k}">${t} <span class="mono">${k === 'all' ? all.length : all.filter((a) => a.kind === k).length}</span></button>`).join('')}</div>`;
+  const head = `<div class="pagehead"><div><span class="label">Aktiver</span><h1 style="margin-top:4px">Aktiver og referencer</h1><p class="sub">Alle genbrugelige produktionsaktiver i filmen, deres versioner, og præcis hvilke shots der bruger dem.</p></div>${tabs}</div>`;
+  if (S.assetTab === 'refs') {
+    const cards = [];
+    for (const a of list) for (const v of a.versions) for (const [r, label] of REF_ROLES[a.kind]) {
+      const ref = v.refs[r]; if (!ref) continue;
+      cards.push(`<button class="vcard" data-act="openAsset" data-id="${a.id}"><div class="frame" style="${a.kind === 'character' ? 'aspect-ratio:4/5' : ''}">${ref.src === 'upload' ? `<img alt="" src="${ref.data}">` : assetSVG(a, r, v.v, v.v)}</div><span class="small"><b>${esc(a.name)}</b> · ${esc(label)}</span><span class="mono faint">${a.code} · v${v.v}${a.master === v.v ? ' · master' : ''} · ${ref.src === 'upload' ? 'upload' : 'genereret'}</span></button>`);
+    }
+    return head + filters + `<div class="refgrid" style="margin-top:16px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${cards.join('') || '<p class="muted">Ingen referencer endnu.</p>'}</div>`;
+  }
+  return head + filters + `<div class="card flush tablewrap" style="margin-top:16px"><table class="data"><thead><tr><th></th><th>Aktiv</th><th>Type</th><th>Master</th><th>Seneste</th><th>Referencer</th><th>Bruges i</th></tr></thead><tbody>
+  ${list.map((a) => { const u = usage(p, a); const old = u.filter((s) => s.assets.some((r) => r.id === a.id && a.master && r.v < a.master && !r.pinned)); const lv = assetLatest(a); return `<tr class="click" data-act="openAsset" data-id="${a.id}"><td style="width:56px">${avatar(a)}</td><td><b>${esc(a.name)}</b><div class="mono faint">${a.code}</div></td><td>${KIND[a.kind].label}</td><td class="mono">${a.master ? 'v' + a.master : '—'}</td><td>${pill(lv.status, `v${lv.v} · ${ST[lv.status]}`)}</td><td class="mono">${Object.keys((assetMasterV(a) || lv).refs).length}/${REF_ROLES[a.kind].length}</td><td><div class="chips">${u.map((s) => `<span class="chip ${old.includes(s) ? 'stale' : ''}" style="cursor:default"><span class="k">SHOT</span>${s.code.slice(5)}</span>`).join('') || '<span class="faint">—</span>'}</div></td></tr>`; }).join('')}
+  </tbody></table></div>`;
+}
+
+/* ---------- Shot Editor ---------- */
+function compilePrompt(p, s) {
+  const parts = [`<b>Stil:</b> ${esc(STYLE_BIBLE)}`];
+  parts.push(`<b>Kamera:</b> ${SHOT_TYPES[s.camera.type]}, ${s.camera.lens} mm, ${MOVES[s.camera.move].toLowerCase()}, ${s.duration} sek.`);
+  for (const r of s.assets) {
+    const a = p.assets[r.id]; if (!a) continue;
+    const v = a.versions.find((x) => x.v === r.v) || assetLatest(a);
+    const attrs = Object.entries(v.attrs).map(([k, val]) => {
+      const dev = s.deviations.find((d) => d.assetId === a.id && d.attr === k);
+      return dev ? `${k.toLowerCase()}: <mark>${esc(dev.value)} (tilladt afvigelse)</mark>` : `${k.toLowerCase()}: ${esc(val)}`;
+    }).join('; ');
+    parts.push(`<b>${KIND[a.kind].label} ${esc(a.code)} v${r.v}</b> — ${esc(a.name)}: ${attrs}. [${Object.keys(v.refs).length} referencebilleder vedlagt]`);
+  }
+  let action = esc(s.action);
+  let notes = esc(s.notes);
+  for (const c of openConflicts(p, s)) { const m = esc(c.match.trim()); action = action.replace(m, `<mark>${m}</mark>`); notes = notes.replace(m, `<mark>${m}</mark>`); }
+  parts.push(`<b>Handling:</b> ${action}`);
+  if (s.notes) parts.push(`<b>Noter:</b> ${notes}`);
+  parts.push(`<b>Lys:</b> ${esc(s.lighting)}`);
+  return parts.join('\n');
+}
+function viewShot(p) {
+  const s = p.shots[S.shotId];
+  if (!s) return '<p>Shottet findes ikke.</p>';
+  const all = Object.values(p.shots);
+  const idx = all.indexOf(s);
+  const sc = p.scenes.find((x) => x.id === s.scene);
+  const fs = frameStatus(p, s), vs = videoStatus(p, s);
+  const fg = frameGates(p, s), vg = videoGates(p, s);
+  const cons = conflicts(p, s);
+  const stale = staleRefs(p, s);
+  const lf = latest(s.frame), lv = latest(s.video);
+  const fSel = S.frameSel && S.frameSel.id === s.id ? S.frameSel.n : (lf ? lf.n : null);
+  const vSel = S.videoSel && S.videoSel.id === s.id ? S.videoSel.n : (lv ? lv.n : null);
+  const fCur = fSel ? s.frame.versions.find((x) => x.n === fSel) : null;
+  const vCur = vSel ? s.video.versions.find((x) => x.n === vSel) : null;
+  const locked = p.storyboard.status !== 'approved';
+
+  const slotActions = (which, cur, gates, st) => {
+    if (!cur) return gatesOk(gates) ? `<button class="btn primary" data-act="gen" data-slot="${which}" data-id="${s.id}">Generér ${which === 'frame' ? 'startframe' : 'video'} <span class="cost">ca. ${kr(PRICE[which])}</span></button>` : '';
+    if (cur.status === 'needs_approval' && !(which === 'video' && st === 'outdated')) return `<div class="row"><button class="btn approve" data-act="approveSlot" data-slot="${which}" data-id="${s.id}" data-n="${cur.n}">Godkend v${cur.n}</button><button class="btn reject" data-act="rejectSlot" data-slot="${which}" data-id="${s.id}" data-n="${cur.n}">Afvis</button></div>`;
+    if (cur.status === 'generating') return pill('generating', `Genererer v${cur.n} hos ${cur.provider} …`);
+    const again = gatesOk(gates) ? `<button class="btn" data-act="gen" data-slot="${which}" data-id="${s.id}">${cur.status === 'failed' ? 'Prøv igen' : 'Generér ny version'} <span class="cost">ca. ${kr(PRICE[which])}</span></button>` : '';
+    return again;
+  };
+
+  return `<div class="pagehead"><div><button class="btn ghost" data-act="nav" data-view="storyboard" style="padding-left:0">← Storyboard</button><div class="row" style="margin-top:4px"><h1 class="mono" style="font-size:22px">${s.code}</h1><span class="muted">Scene ${sc ? sc.n : ''} · ${esc(sc ? sc.heading : '')}</span></div></div>
+    <div class="row"><button class="btn sm" data-act="openShot" data-id="${all[(idx - 1 + all.length) % all.length].id}">← ${all[(idx - 1 + all.length) % all.length].code}</button><button class="btn sm" data-act="openShot" data-id="${all[(idx + 1) % all.length].id}">${all[(idx + 1) % all.length].code} →</button></div></div>
+  ${stale.length ? `<div class="notice old" style="margin-bottom:16px"><span>↻</span><div class="grow">${stale.map((r) => { const a = p.assets[r.id]; return `<p><b>Forældet:</b> bygger på ${esc(a.name)} v${r.v} — master er nu v${a.master} (${esc(a.versions.find((v) => v.v === a.master).note || 'ny version')}).</p><div class="row" style="margin-top:6px"><button class="btn sm" data-act="updateRef" data-id="${s.id}" data-aid="${a.id}">Opdatér til v${a.master}</button><button class="btn sm" data-act="pinRef" data-id="${s.id}" data-aid="${a.id}">Behold v${r.v} bevidst</button></div>`; }).join('')}<p class="small" style="margin-top:6px">Opdaterer du, skal startframe og video laves igen. Godkendte versioner bevares i historikken.</p></div></div>` : ''}
+  <div class="editor">
+    <div class="stack">
+      <div class="card stack">
+        <div class="section-title" style="margin:0"><h2>Startframe</h2>${pill(fs)}</div>
+        ${frameBox(p, s, 'frame', fSel)}
+        ${fCur && fCur.comment ? `<p class="small" style="color:${fCur.status === 'outdated' ? 'var(--st-old)' : 'var(--st-rej)'}">${fCur.status === 'outdated' ? 'Forældet' : 'Afvist'}: ${esc(fCur.comment)}</p>` : ''}
+        ${s.frame.versions.length > 1 ? `<div class="versionstrip">${s.frame.versions.map((v) => `<button class="vcard ${v.n === fSel ? 'on' : ''}" data-act="selFrame" data-id="${s.id}" data-n="${v.n}">${frameBox(p, s, 'frame', v.n, { tc: false, noDim: true })}<span class="row small"><span class="mono">v${v.n}</span>${pill(v.status)}</span></button>`).join('')}</div>` : ''}
+        ${locked ? '' : slotActions('frame', fCur && fCur.n === (lf && lf.n) ? fCur : lf, fg, fs)}
+        ${!gatesOk(fg) && !locked ? `<div class="stack tight"><span class="label">Før startframe kan genereres</span>${gateList(fg)}</div>` : ''}
+      </div>
+      <div class="card stack">
+        <div class="section-title" style="margin:0"><h2>Video</h2>${pill(vs)}</div>
+        ${frameBox(p, s, 'video', vSel)}
+        ${lv && lv.status === 'failed' ? `<div class="notice fail"><span>×</span><div class="grow"><p>Generering fejlede hos alle providere. Intet er betalt to gange: hvert job blev stoppet, før næste provider blev prøvet.</p><button class="btn sm" style="margin-top:6px" data-act="nav" data-view="queue">Se forløbet i produktionskøen</button></div></div>` : ''}
+        ${!locked && fs === 'approved' ? slotActions('video', vCur && vCur.n === (lv && lv.n) ? vCur : lv, vg, vs) : ''}
+        ${!gatesOk(vg) && !locked ? `<div class="stack tight"><span class="label">Før video kan genereres</span>${gateList(vg)}</div>` : ''}
+        ${s.video.versions.length > 1 ? `<div class="versionstrip">${s.video.versions.map((v) => `<button class="vcard ${v.n === vSel ? 'on' : ''}" data-act="selVideo" data-id="${s.id}" data-n="${v.n}">${frameBox(p, s, 'video', v.n, { tc: false, noDim: true })}<span class="row small"><span class="mono">v${v.n}</span>${pill(v.status)}</span></button>`).join('')}</div>` : ''}
+      </div>
+    </div>
+    <div class="stack">
+      <div class="card stack">
+        <div class="section-title" style="margin:0"><h2>Referencer</h2><span class="small muted">låst til version</span></div>
+        <div class="stack tight">${s.assets.map((r) => { const a = p.assets[r.id]; const isStale = a.master && r.v < a.master && !r.pinned; return `<div class="row">${avatar(a)}<div class="grow"><div class="row" style="gap:6px"><b>${esc(a.name)}</b><span class="mono faint">${a.code} v${r.v}</span>${r.pinned ? '<span class="small muted">📌 fastholdt</span>' : ''}</div><div class="small muted">${KIND[a.kind].label} · ${esc(a.role)}</div></div>${isStale ? pill('outdated') : a.master ? pill('approved', 'Master') : pill(assetStatus(a))}<button class="btn ghost sm" data-act="openAsset" data-id="${a.id}">Åbn</button></div>`; }).join('')}</div>
+      </div>
+      <div class="card stack">
+        <div class="section-title" style="margin:0"><h2>Kontinuitet</h2>${cons.some((c) => !c.allowed) ? pill('needs_approval', 'Konflikt') : pill('approved', 'I orden')}</div>
+        ${cons.filter((c) => !c.allowed).map((c) => `<div class="notice warn"><span>⚠</span><div class="grow"><p><b>Shottet strider mod ${esc(c.assetName)} v${s.assets.find((r) => r.id === c.assetId).v}.</b></p><p>${esc(c.attr)}: master siger <b>${esc(c.master)}</b>, shottet siger <b>${esc(c.shot)}</b>.</p><div class="row" style="margin-top:8px"><button class="btn sm" data-act="fixConflict" data-id="${s.id}" data-aid="${c.assetId}" data-attr="${esc(c.attr)}">Ret automatisk</button><button class="btn sm" data-act="allowDeviation" data-id="${s.id}" data-aid="${c.assetId}" data-attr="${esc(c.attr)}">Tillad afvigelse</button></div></div></div>`).join('')}
+        <div class="contlist">${contRows(p, s, cons)}</div>
+      </div>
+      <div class="card stack">
+        <div class="section-title" style="margin:0"><h2>Spec</h2><span class="small muted">${locked ? 'Godkendes med storyboardet' : 'Ændringer gør eksisterende versioner forældede'}</span></div>
+        <div class="formgrid">
+          <label class="field">Beskæring<select id="sp_type_${s.id}" data-spec="type" data-id="${s.id}">${Object.entries(SHOT_TYPES).map(([k, v]) => `<option value="${k}" ${k === s.camera.type ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+          <label class="field">Bevægelse<select id="sp_move_${s.id}" data-spec="move" data-id="${s.id}">${Object.entries(MOVES).map(([k, v]) => `<option value="${k}" ${k === s.camera.move ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+          <label class="field">Optik<span class="hint">mm</span><input type="number" id="sp_lens_${s.id}" data-spec="lens" data-id="${s.id}" value="${s.camera.lens}"></label>
+          <label class="field">Varighed<span class="hint">sek.</span><input type="number" id="sp_dur_${s.id}" data-spec="duration" data-id="${s.id}" value="${s.duration}" min="1" max="15"></label>
+          <label class="field full">Handling<textarea id="sp_action_${s.id}" rows="2" data-spec="action" data-id="${s.id}">${esc(s.action)}</textarea></label>
+          ${s.dialogue ? `<label class="field full">Replik<input type="text" id="sp_dia_${s.id}" data-spec="dialogue" data-id="${s.id}" value="${esc(s.dialogue)}"></label>` : ''}
+          <label class="field full">Noter<span class="hint">Fri tekst — kontinuitetstjekkes mod aktiverne</span><textarea id="sp_notes_${s.id}" rows="2" data-spec="notes" data-id="${s.id}" placeholder="Fx: Sander ser træt ud">${esc(s.notes)}</textarea></label>
+          <label class="field">Lys<input type="text" id="sp_light_${s.id}" data-spec="lighting" data-id="${s.id}" value="${esc(s.lighting)}"></label>
+          <label class="field">Lyd<input type="text" value="${esc(s.lighting.includes('gade') ? 'motor i tomgang' : 'gade-ambience')}" disabled><span class="hint">MVP 4</span></label>
+        </div>
+        <div class="row"><button class="btn sm" data-act="checkSpec" data-id="${s.id}">Kør kontinuitetstjek</button></div>
+      </div>
+      <div class="card stack">
+        <div class="section-title" style="margin:0"><h2>Kompileret prompt</h2><span class="small muted">Bygges af systemet — ikke redigerbar</span></div>
+        <div class="prompt">${compilePrompt(p, s)}</div>
+      </div>
+    </div>
+  </div>`;
+}
+function contRows(p, s, cons) {
+  const rows = [];
+  for (const r of s.assets) {
+    const a = p.assets[r.id];
+    const c = cons.filter((x) => x.assetId === a.id);
+    if (!c.length) { rows.push(`<div class="controw"><span>${esc(a.name)}</span><span class="res match">Match</span></div>`); continue; }
+    for (const x of c) rows.push(`<div class="controw ${x.allowed ? '' : 'conflict'}"><span>${esc(a.name)} · ${esc(x.attr)}</span><span class="res ${x.allowed ? 'dev' : 'conflict'}">${x.allowed ? 'Tilladt afvigelse' : 'Konflikt'}</span></div>`);
+  }
+  return rows.join('');
+}
+
+/* ---------- Godkendelser ---------- */
+function viewApprovals(p) {
+  const items = pendingApprovals(p), dec = decisions(p);
+  const frames = items.filter((i) => i.type === 'frame');
+  const thumb = (i) => {
+    if (i.type === 'frame') return frameBox(p, p.shots[i.id], 'frame', latest(p.shots[i.id].frame).n, { tc: false });
+    if (i.type === 'video') return frameBox(p, p.shots[i.id], 'video', latest(p.shots[i.id].video).n, { tc: false });
+    if (i.type === 'asset') { const a = p.assets[i.id]; const r = REF_ROLES[a.kind][0][0]; return `<div class="frame">${assetSVG(a, r, 1, assetLatest(a).v)}</div>`; }
+    return `<div class="frame"><div class="empty">${i.type === 'brief' ? 'Film Brief' : 'Storyboard'}</div></div>`;
+  };
+  const acts = (i) => {
+    if (i.type === 'brief') return `<button class="btn approve sm" data-act="approveBrief">Godkend</button><button class="btn sm" data-act="nav" data-view="brief">Læs</button>`;
+    if (i.type === 'storyboard') return `<button class="btn approve sm" data-act="approveStoryboard">Godkend</button><button class="btn sm" data-act="nav" data-view="storyboard">Gennemgå</button>`;
+    if (i.type === 'asset') return `<button class="btn approve sm" data-act="approveAsset" data-id="${i.id}" data-v="${assetLatest(p.assets[i.id]).v}">Godkend som master</button><button class="btn reject sm" data-act="rejectAsset" data-id="${i.id}" data-v="${assetLatest(p.assets[i.id]).v}">Afvis</button>`;
+    const slot = i.type; const n = latest(p.shots[i.id][slot]).n;
+    return `<button class="btn approve sm" data-act="approveSlot" data-slot="${slot}" data-id="${i.id}" data-n="${n}">Godkend</button><button class="btn reject sm" data-act="rejectSlot" data-slot="${slot}" data-id="${i.id}" data-n="${n}">Afvis</button><button class="btn sm" data-act="openShot" data-id="${i.id}">Åbn</button>`;
+  };
+  const typeLabel = { brief: 'Brief', storyboard: 'Storyboard', asset: 'Master', frame: 'Startframe', video: 'Video' };
+  return `<div class="pagehead"><div><span class="label">Produktion</span><h1 style="margin-top:4px">Godkendelser</h1><p class="sub">Alt, der venter på dit ja, samlet ét sted. Intet går videre til næste trin uden en godkendelse — og betalte trin kræver et ja, før de overhovedet starter.</p></div>${frames.length > 1 ? `<button class="btn approve" data-act="approveAllFrames">Godkend alle ${frames.length} startframes</button>` : ''}</div>
+  <div class="stack">
+    <div class="card flush"><div class="section-title" style="padding:14px 16px 0"><h2>Venter på din godkendelse</h2>${pill(items.length ? 'needs_approval' : 'approved', items.length ? `${items.length} venter` : 'Intet venter')}</div>
+      ${items.map((i) => `<div class="approvalitem">${thumb(i)}<div class="stack tight"><span class="label">${typeLabel[i.type]}</span><b>${esc(i.title)}</b><span class="small muted">${esc(i.sub)}</span></div><div class="row acts">${acts(i)}</div></div>`).join('') || '<p class="muted" style="padding:16px">Du er helt ajour.</p>'}
+    </div>
+    <div class="card flush"><div class="section-title" style="padding:14px 16px 0"><h2>Kræver et valg</h2>${pill(dec.length ? 'outdated' : 'approved', dec.length ? `${dec.length} shots` : 'Ingen')}</div>
+      ${dec.map((i) => `<div class="approvalitem">${frameBox(p, p.shots[i.id], 'frame', null, { tc: false })}<div class="stack tight"><span class="label">${i.type === 'conflict' ? 'Kontinuitet' : 'Forældet aktiv'}</span><b>${esc(i.title)}</b><span class="small muted">${esc(i.sub)}</span></div><div class="row acts"><button class="btn sm" data-act="openShot" data-id="${i.id}">Afklar i Shot Editor</button></div></div>`).join('') || '<p class="muted" style="padding:16px">Ingen konflikter.</p>'}
+    </div>
+  </div>`;
+}
+
+/* ---------- Produktionskø ---------- */
+function jobTarget(p, j) {
+  if (j.target.type === 'asset') { const a = p.assets[j.target.id]; return { code: a.code, label: 'Master-referencer', status: (a.versions.find((v) => v.v === j.target.n) || {}).status, open: `data-act="openAsset" data-id="${a.id}"` }; }
+  const s = p.shots[j.target.id]; const v = s[j.target.slot].versions.find((x) => x.n === j.target.n);
+  let st = v ? v.status : 'draft';
+  if (st === 'approved' && j.target.slot === 'frame' && staleRefs(p, s).length) st = 'outdated';
+  return { code: s.code, label: j.target.slot === 'frame' ? `Startframe v${j.target.n}` : `Video v${j.target.n}`, status: st, open: `data-act="openShot" data-id="${s.id}"` };
+}
+function viewQueue(p) {
+  const cols = [['queued', 'I kø'], ['generating', 'Genererer'], ['needs_approval', 'Venter på dig'], ['failed', 'Fejlet'], ['done', 'Afsluttet']];
+  const bucket = (j) => { if (j.status === 'queued') return 'queued'; if (j.status === 'generating') return 'generating'; if (j.status === 'failed') return 'failed'; const t = jobTarget(p, j); return t.status === 'needs_approval' ? 'needs_approval' : 'done'; };
+  const jobs = p.jobs.slice().reverse();
+  return `<div class="pagehead"><div><span class="label">Produktion</span><h1 style="margin-top:4px">Produktionskø</h1><p class="sub">Hver generering er et job med provider, pris og forløb. Fejler en provider, prøver systemet den næste — men først når det forrige job er bekræftet stoppet, så intet betales to gange.</p></div></div>
+  <div class="kanban">${cols.map(([k, t]) => { const list = jobs.filter((j) => bucket(j) === k); return `<div class="kcol"><h3>${t}<span class="mono muted">${list.length}</span></h3>${list.map((j) => jobCard(p, j)).join('') || '<span class="small faint">Tom</span>'}</div>`; }).join('')}</div>`;
+}
+function jobCard(p, j) {
+  const t = jobTarget(p, j);
+  const st = j.status === 'queued' ? 'draft' : j.status === 'generating' ? 'generating' : j.status === 'failed' ? 'failed' : t.status;
+  return `<div class="job"><div class="row between"><button class="btn ghost sm mono" style="padding:0" ${t.open}>${esc(t.code)}</button>${pill(st, j.status === 'queued' ? 'I kø' : null)}</div><span>${esc(t.label)}</span><span class="small muted">${esc(j.provider)} · ${kr(j.cost)} · ${esc(j.at)}</span>
+  ${j.attempts.length > 1 || j.status === 'failed' ? `<div class="attempts">${j.attempts.map((a) => `<span class="${a.result === 'bad' ? 'bad' : ''}">${esc(a.provider)}: ${esc(a.text || (a.result === 'ok' ? 'ok' : ''))}</span>`).join('')}</div>` : ''}
+  ${j.status === 'failed' ? `<button class="btn sm" data-act="retryJob" data-job="${j.id}">Prøv igen <span class="cost">ca. ${kr(j.cost)}</span></button>` : ''}
+  ${st === 'needs_approval' ? `<button class="btn sm" ${t.open}>Se og godkend</button>` : ''}</div>`;
+}
+
+/* ---------- Ark (bekræftelse af betalte trin) og toasts ---------- */
+function sheet() {
+  const sh = S.sheet; if (!sh) return '';
+  const p = P();
+  const after = p.budget.spent + sh.cost;
+  return `<div class="scrim" data-act="closeSheet"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-stop="1">
+    <div class="stack tight"><span class="label">Betalt trin · kræver dit ja</span><h2 id="sheet-t">${esc(sh.title)}</h2><p class="muted">${esc(sh.sub)}</p></div>
+    <div>${sh.lines.map((l) => `<div class="costline"><span>${esc(l[0])}</span><span class="mono">${esc(l[1])}</span></div>`).join('')}</div>
+    <div class="stack tight"><div class="row between small"><span>Budget efter dette</span><span class="mono">${kr(after)} af ${kr(p.budget.limit)}</span></div><div class="budget"><i style="width:${Math.min(100, (p.budget.spent / p.budget.limit) * 100)}%;background:var(--muted)"></i><i style="width:${Math.min(100, (sh.cost / p.budget.limit) * 100)}%;background:var(--accent)"></i></div></div>
+    <p class="small muted">Prisen reserveres nu og bogføres, når provideren melder færdig. Fejler en provider, prøves den næste inden for samme reservation.</p>
+    <div class="row"><button class="btn primary" data-act="confirmSheet">Godkend og generér · ${kr(sh.cost)}</button><button class="btn" data-act="closeSheet">Fortryd</button></div>
+  </div></div>`;
+}
+function toasts() { return `<div class="toasts" aria-live="polite">${S.toasts.map((t) => `<div class="toast">${esc(t.text)}</div>`).join('')}</div>`; }
+function toast(text) { const t = { id: nextId('t'), text }; S.toasts.push(t); setTimeout(() => { S.toasts = S.toasts.filter((x) => x.id !== t.id); render(); }, 3200); }
+
+/* =====================================================================
+   Simulering af generering
+   ===================================================================== */
+function runJob(pid, job, ms, outcome = 'ok') {
+  job.status = 'queued';
+  setTimeout(() => { job.status = 'generating'; setVersionStatus(pid, job, 'generating'); render(); }, 500);
+  setTimeout(() => {
+    const p = S.projects[pid]; if (!p) return;
+    if (outcome === 'ok') { job.status = 'done'; setVersionStatus(pid, job, 'needs_approval'); p.budget.spent += job.cost; toast(`${jobTarget(p, job).code}: ${jobTarget(p, job).label.toLowerCase()} venter på dig`); }
+    else { job.status = 'failed'; setVersionStatus(pid, job, 'failed'); }
+    render();
+  }, 500 + ms);
+}
+function setVersionStatus(pid, job, st) {
+  const p = S.projects[pid]; if (!p) return;
+  if (job.target.type === 'asset') {
+    const a = p.assets[job.target.id]; const v = a.versions.find((x) => x.v === job.target.n);
+    if (v) { v.status = st; if (st === 'needs_approval') for (const [r] of REF_ROLES[a.kind].slice(0, a.kind === 'character' ? 4 : 3)) if (!v.refs[r]) v.refs[r] = { src: 'gen' }; }
+    return;
+  }
+  const s = p.shots[job.target.id]; const v = s[job.target.slot].versions.find((x) => x.n === job.target.n);
+  if (v) v.status = st;
+}
+function startGen(p, slot, shotId) {
+  const s = p.shots[shotId];
+  const n = s[slot].versions.length + 1;
+  const provider = PROVIDERS[slot === 'frame' ? 'image' : 'video'][0];
+  s[slot].versions.push(mkVersion(n, 'generating', { provider }));
+  const job = { id: nextId('job'), target: { type: 'shot', id: shotId, slot, n }, status: 'queued', provider, cost: PRICE[slot], at: 'lige nu', attempts: [{ provider, result: 'ok' }] };
+  p.jobs.push(job);
+  if (slot === 'frame') S.frameSel = null; else S.videoSel = null;
+  runJob(p.id, job, slot === 'frame' ? 2200 + Math.random() * 1200 : 3600 + Math.random() * 1500);
+}
+
+/* =====================================================================
+   Handlinger
+   ===================================================================== */
+const ACT = {
+  home() { S.pid = null; S.view = 'projects'; },
+  reset() { try { localStorage.removeItem(STORE_KEY); } catch (e) { /* ingen lagring */ } S = freshState(); resumeDemo(); toast('Demoen er startet forfra.'); },
+  newProject() { S.pid = null; S.view = 'new'; S.draftIdea = { ...SANDER_IDEA, title: 'Sander bliver afbrudt — ny version', pid: null }; },
+  openProject(d) { S.pid = d.id; S.view = 'overview'; S.draftIdea = null; },
+  nav(d) { if (!d.view) return; S.view = d.view; if (d.view !== 'asset') S.assetV = null; },
+  sbMode(d) { S.sbMode = d.mode; },
+  assetTab(d) { S.assetTab = d.tab; },
+  assetFilter(d) { S.assetFilter = d.f; },
+  openShot(d) { S.view = 'shot'; S.shotId = d.id; S.frameSel = null; S.videoSel = null; S.playing = null; },
+  openAsset(d) { S.view = 'asset'; S.assetId = d.id; S.assetV = null; },
+  selAssetV(d) { S.assetV = { id: d.id, v: Number(d.v) }; },
+  selFrame(d) { S.frameSel = { id: d.id, n: Number(d.n) }; },
+  selVideo(d) { S.videoSel = { id: d.id, n: Number(d.n) }; },
+  play(d) { S.playing = d.id; const s = P().shots[d.id]; setTimeout(() => { if (S.playing === d.id) { S.playing = null; render(); } }, s.duration * 1000 + 200); },
+
+  createProject() {
+    const d = S.draftIdea; if (!d.title.trim() || !d.idea.trim()) { toast('Giv filmen en titel og en idé.'); return; }
+    const p = buildEmptyProject({ title: d.title.trim(), idea: d.idea, message: d.message, audience: d.audience, feeling: d.feeling, duration: Number(d.duration) || 60, style: d.style });
+    S.projects[p.id] = p; S.order.unshift(p.id); S.pid = p.id; S.view = 'brief'; S.draftIdea = null;
+    genBrief(p);
+  },
+  generateBrief() {
+    const p = P(); const d = S.draftIdea;
+    p.idea = { title: d.title, idea: d.idea, message: d.message, audience: d.audience, feeling: d.feeling, duration: Number(d.duration) || 60, style: d.style };
+    p.title = d.title; S.view = 'brief'; genBrief(p);
+  },
+  approveBrief() { const p = P(); p.brief.status = 'approved'; toast('Briefet er godkendt. Nu kan storyboardet laves.'); },
+  rejectBrief() { const p = P(); p.brief.status = 'rejected'; p.ideaStatus = 'draft'; S.view = 'idea'; toast('Briefet er afvist. Ret idéen, og foreslå et nyt.'); },
+  generateStoryboard() {
+    const p = P(); p.storyboard.status = 'generating'; p.storyboard.version += 1;
+    setTimeout(() => {
+      const sp = S.projects[p.id]; if (!sp) return;
+      sp.scenes = SCENES.map((s) => ({ ...s }));
+      sp.shots = {}; for (const s of shotTemplates()) sp.shots[s.id] = s;
+      sp.assets = {}; for (const t of assetTemplates()) sp.assets[t.id] = assetFromTemplate(t, 'draft');
+      const c = Math.round((sp.idea.duration || 60) / 60 * 100) / 100; if (c !== 1) for (const s of Object.values(sp.shots)) s.duration = Math.max(1, Math.round(s.duration * c));
+      sp.storyboard.status = 'needs_approval';
+      toast('Storyboard og 9 aktiver er foreslået. De venter på dig.'); render();
+    }, 2600);
+  },
+  approveStoryboard() { P().storyboard.status = 'approved'; toast('Storyboardet er godkendt. Godkend karakterer og locations, så shots kan produceres.'); },
+  rejectStoryboard() { const p = P(); p.storyboard.status = 'draft'; p.shots = {}; p.scenes = []; p.assets = {}; toast('Storyboardet er afvist. Lad instruktøren foreslå et nyt.'); },
+
+  newAsset(d) {
+    const p = P(); const kind = d.kind; const n = Object.values(p.assets).filter((a) => a.kind === kind).length + 1;
+    const id = nextId('a');
+    const attrs = kind === 'character' ? { 'Alder': '', 'Hår': '', 'Overdel': '', 'Kendetegn': '' } : kind === 'location' ? { 'Arkitektur': '', 'Tid på dagen': '', 'Lys': '', 'Vejr': '', 'Farvepalet': '' } : { 'Udseende': '' };
+    p.assets[id] = { id, code: `${KIND[kind].code}_NY${n}_01`, kind, name: `Ny ${KIND[kind].label.toLowerCase()} ${n}`, role: 'Tilføjet manuelt', look: kind === 'character' ? 'per' : kind === 'location' ? 'villavej' : 'phone', rules: [], consent: kind === 'character' ? false : null, master: null, versions: [{ v: 1, status: 'draft', attrs, note: '', refs: {} }] };
+    S.view = 'asset'; S.assetId = id; S.assetV = null; toast('Oprettet som kladde. Udfyld identiteten, og generér master-referencer.');
+  },
+  consent(d) { P().assets[d.id].consent = true; toast('Samtykke registreret.'); },
+  genMaster(d) {
+    const p = P(); const a = p.assets[d.id]; const v = Number(d.v);
+    openSheet({ title: `Generér master-referencer for ${a.name}`, sub: `${KIND[a.kind].label} ${a.code} v${v}. Referencerne bliver den officielle identitet, som alle shots bruger.`, cost: PRICE.master,
+      lines: [['Provider', 'Billedmodel B (bedst til referenceark)'], ['Billeder', `${REF_ROLES[a.kind].length - (a.kind === 'character' ? 1 : 0)} vinkler`], ['Pris', `ca. ${kr(PRICE.master)}`]],
+      run: () => { const ver = a.versions.find((x) => x.v === v); ver.status = 'generating'; const job = { id: nextId('job'), target: { type: 'asset', id: a.id, slot: 'master', n: v }, status: 'queued', provider: 'Billedmodel B', cost: PRICE.master, at: 'lige nu', attempts: [{ provider: 'Billedmodel B', result: 'ok' }] }; p.jobs.push(job); runJob(p.id, job, 2400); } });
+  },
+  approveAsset(d) {
+    const p = P(); const a = p.assets[d.id]; const v = a.versions.find((x) => x.v === Number(d.v));
+    v.status = 'approved';
+    if (!a.master) { a.master = v.v; toast(`${a.name} v${v.v} er godkendt og er nu master.`); }
+    else toast(`${a.name} v${v.v} er godkendt. Gør den til master, når du er klar.`);
+  },
+  rejectAsset(d) { const a = P().assets[d.id]; a.versions.find((x) => x.v === Number(d.v)).status = 'rejected'; toast(`${a.name} v${d.v} er afvist. Ret identiteten, og generér igen.`); },
+  makeMaster(d) {
+    const p = P(); const a = p.assets[d.id]; a.master = Number(d.v);
+    const hit = usage(p, a).filter((s) => s.assets.some((r) => r.id === a.id && r.v < a.master && !r.pinned));
+    toast(hit.length ? `${a.name} v${a.master} er master. ${hit.length} shots er nu markeret som forældede.` : `${a.name} v${a.master} er master.`);
+  },
+  newVersion(d) {
+    const a = P().assets[d.id]; const base = assetMasterV(a) || assetLatest(a);
+    a.versions.push({ v: assetLatest(a).v + 1, status: 'draft', attrs: { ...base.attrs }, note: 'Ret identiteten herunder', refs: {} });
+    S.assetV = null; toast(`v${assetLatest(a).v} er oprettet som kladde. Den gamle master er uændret.`);
+  },
+
+  gen(d) {
+    const p = P(); const s = p.shots[d.id]; const slot = d.slot;
+    const gates = slot === 'frame' ? frameGates(p, s) : videoGates(p, s);
+    if (!gatesOk(gates)) { toast('Shottet mangler noget, før det kan genereres.'); return; }
+    const provider = PROVIDERS[slot === 'frame' ? 'image' : 'video'];
+    openSheet({ title: `Generér ${slot === 'frame' ? 'startframe' : 'video'} for ${s.code}`, sub: slot === 'frame' ? 'Bygges ud fra shottets spec og de godkendte aktivers referencebilleder.' : `Image-to-video ud fra den godkendte startframe · ${s.duration} sek. · ${MOVES[s.camera.move].toLowerCase()}.`, cost: PRICE[slot],
+      lines: [['Provider', `${provider[0]} (reserve: ${provider[1]})`], ['Evne', slot === 'frame' ? 'text-to-image med referencer' : 'image-to-video'], ['Pris', `ca. ${kr(PRICE[slot])}`]],
+      run: () => startGen(p, slot, s.id) });
+  },
+  batchFrames() {
+    const p = P(); const ready = Object.values(p.shots).filter((s) => frameStatus(p, s) === 'draft' && gatesOk(frameGates(p, s)));
+    if (!ready.length) return;
+    openSheet({ title: `Generér ${ready.length} startframes`, sub: `${ready.map((s) => s.code).join(', ')}. Én godkendelse dækker hele batchen — hver frame skal stadig godkendes bagefter.`, cost: ready.length * PRICE.frame,
+      lines: [['Provider', 'Billedmodel A (reserve: Billedmodel B)'], ['Antal', `${ready.length} × ${kr(PRICE.frame)}`], ['I alt', `ca. ${kr(ready.length * PRICE.frame)}`]],
+      run: () => ready.forEach((s, i) => setTimeout(() => { startGen(p, 'frame', s.id); render(); }, i * 350)) });
+  },
+  approveSlot(d) {
+    const p = P(); const s = p.shots[d.id]; const v = s[d.slot].versions.find((x) => x.n === Number(d.n));
+    v.status = 'approved'; s[d.slot].approved = v.n;
+    toast(d.slot === 'frame' ? `${s.code}: startframe godkendt. Video kan nu genereres.` : `${s.code}: video godkendt.`);
+  },
+  rejectSlot(d) { const p = P(); const s = p.shots[d.id]; const v = s[d.slot].versions.find((x) => x.n === Number(d.n)); v.status = 'rejected'; v.comment = 'Afvist i prototypen'; toast(`${s.code}: v${v.n} er afvist. Generér en ny version.`); },
+  approveAllFrames() { const p = P(); let n = 0; for (const s of Object.values(p.shots)) if (frameStatus(p, s) === 'needs_approval') { const v = latest(s.frame); v.status = 'approved'; s.frame.approved = v.n; n++; } toast(`${n} startframes er godkendt.`); },
+  retryJob(d) {
+    const p = P(); const j = p.jobs.find((x) => x.id === d.job); const s = p.shots[j.target.id];
+    const n = s[j.target.slot].versions.length + 1;
+    const doIt = () => {
+      s[j.target.slot].versions.push(mkVersion(n, 'generating', { provider: 'Videomodel B' }));
+      const job = { id: nextId('job'), target: { ...j.target, n }, status: 'queued', provider: 'Videomodel B', cost: j.cost, at: 'lige nu', attempts: [{ provider: 'Videomodel B', result: 'ok' }] };
+      p.jobs.push(job); runJob(p.id, job, 3800);
+    };
+    openSheet({ title: `Prøv igen: ${s.code}`, sub: 'Det fejlede job er bekræftet stoppet og ikke betalt. Et nyt forsøg er en ny generering.', cost: j.cost, lines: [['Provider', 'Videomodel B'], ['Pris', `ca. ${kr(j.cost)}`]], run: doIt });
+  },
+  updateRef(d) {
+    const p = P(); const s = p.shots[d.id]; const r = s.assets.find((x) => x.id === d.aid); const a = p.assets[d.aid];
+    const old = r.v; r.v = a.master; r.pinned = false;
+    // Godkendte versioner bevares i historikken, men markeres som forældede.
+    for (const slot of ['frame', 'video']) {
+      for (const v of s[slot].versions) if (v.status === 'approved' || v.status === 'needs_approval') { v.status = 'outdated'; v.comment = `Bygget på ${a.name} v${old}`; }
+      s[slot].approved = null;
+    }
+    toast(`${s.code} bruger nu ${a.name} v${a.master}. Generér en ny startframe.`);
+  },
+  pinRef(d) { const p = P(); const s = p.shots[d.id]; const r = s.assets.find((x) => x.id === d.aid); r.pinned = true; toast(`${s.code} beholder bevidst ${p.assets[d.aid].name} v${r.v}.`); },
+  fixConflict(d) {
+    const p = P(); const s = p.shots[d.id]; const c = openConflicts(p, s).find((x) => x.assetId === d.aid && x.attr === d.attr); if (!c) return;
+    s.notes = s.notes.replace(c.match.trim(), c.master); s.action = s.action.replace(c.match.trim(), c.master);
+    toast(`Rettet: "${c.shot}" er erstattet med "${c.master}".`);
+  },
+  allowDeviation(d) {
+    const p = P(); const s = p.shots[d.id]; const c = openConflicts(p, s).find((x) => x.assetId === d.aid && x.attr === d.attr); if (!c) return;
+    s.deviations.push({ assetId: d.aid, attr: d.attr, value: c.shot, reason: 'Tilladt i Shot Editor' });
+    toast(`Afvigelsen er tilladt for ${s.code} og gemt med shottet.`);
+  },
+  checkSpec(d) { const p = P(); const s = p.shots[d.id]; const n = openConflicts(p, s).length; toast(n ? `${n} kontinuitetskonflikt fundet.` : 'Ingen konflikter. Shottet matcher alle aktiver.'); },
+
+  confirmSheet() { const sh = S.sheet; S.sheet = null; if (sh && sh.run) sh.run(); },
+  closeSheet(d, el, ev) { if (ev && ev.target.closest('[data-stop]') && !ev.target.closest('[data-act="closeSheet"]:not(.scrim)')) return; S.sheet = null; },
+};
+function openSheet(sh) { S.sheet = sh; }
+function genBrief(p) {
+  p.brief.status = 'generating'; p.ideaStatus = 'approved';
+  setTimeout(() => {
+    const sp = S.projects[p.id]; if (!sp) return;
+    sp.brief.version += 1;
+    sp.brief.content = { ...SANDER_BRIEF, message: sp.idea.message || SANDER_BRIEF.message, audience: sp.idea.audience || SANDER_BRIEF.audience, feeling: sp.idea.feeling || SANDER_BRIEF.feeling, duration: Number(sp.idea.duration) || 60, style: sp.idea.style || SANDER_BRIEF.style };
+    sp.brief.status = 'needs_approval';
+    toast(`Film Brief v${sp.brief.version} er klar og venter på dig.`); render();
+  }, 2400);
+}
+
+/* Genoptag simulerede jobs, der stod som "genererer", da siden blev åbnet. */
+function resumeDemo() {
+  for (const p of Object.values(S.projects)) for (const j of p.jobs) if (j.status === 'generating' || j.status === 'queued') runJob(p.id, j, 3000 + Math.random() * 2500);
+  for (const p of Object.values(S.projects)) {
+    if (p.brief.status === 'generating') genBrief(p);
+    if (p.storyboard.status === 'generating') { p.storyboard.status = 'draft'; p.storyboard.version = Math.max(0, p.storyboard.version - 1); }
+    for (const a of Object.values(p.assets)) for (const v of a.versions) if (v.status === 'generating' && !p.jobs.some((j) => j.target.type === 'asset' && j.target.id === a.id && j.target.n === v.v && (j.status === 'generating' || j.status === 'queued'))) v.status = 'draft';
+  }
+}
+
+/* =====================================================================
+   Hændelser
+   ===================================================================== */
+document.addEventListener('click', (ev) => {
+  const el = ev.target.closest('[data-act]');
+  if (!el) return;
+  if (el.classList.contains('scrim') && ev.target !== el) return;
+  ev.preventDefault();
+  const fn = ACT[el.dataset.act];
+  if (fn) { fn({ ...el.dataset }, el, ev); render(); if (['nav', 'openShot', 'openAsset', 'openProject', 'newProject', 'home'].includes(el.dataset.act)) window.scrollTo(0, 0); }
+});
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape' && S.sheet) { S.sheet = null; render(); }
+  if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches('.shotcard[data-act]')) { ev.preventDefault(); ev.target.click(); }
+});
+document.addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  const act = ev.target.dataset.form; if (ACT[act]) { ACT[act](); render(); window.scrollTo(0, 0); }
+});
+document.addEventListener('input', (ev) => {
+  const t = ev.target;
+  if (t.dataset.bind && S.draftIdea) { S.draftIdea[t.dataset.bind] = t.value; save(); return; }
+  if (t.dataset.attr) { const a = P().assets[t.dataset.aid]; const v = a.versions.find((x) => x.v === Number(t.dataset.v)); v.attrs[t.dataset.attr] = t.value; if (t.dataset.attr === 'Navn') a.name = t.value; save(); return; }
+  if (t.dataset.spec) {
+    const s = P().shots[t.dataset.id]; const k = t.dataset.spec;
+    if (['type', 'move', 'lens'].includes(k)) s.camera[k] = k === 'lens' ? Number(t.value) : t.value;
+    else if (k === 'duration') s.duration = Math.max(1, Math.min(15, Number(t.value) || 1));
+    else s[k] = t.value;
+    save();
+  }
+});
+document.addEventListener('change', (ev) => {
+  const t = ev.target;
+  if (t.dataset.spec && t.tagName === 'SELECT') render();
+  if (t.dataset.upload) {
+    const file = t.files && t.files[0]; if (!file) return;
+    const r = new FileReader();
+    r.onload = () => { const a = P().assets[t.dataset.upload]; const v = a.versions.find((x) => x.v === Number(t.dataset.v)); v.refs[t.dataset.role] = { src: 'upload', data: r.result }; toast('Referencen er uploadet.'); render(); };
+    r.readAsDataURL(file);
+  }
+});
+
+resumeDemo();
+render();
+</script>
