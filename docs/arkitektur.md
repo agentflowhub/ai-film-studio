@@ -1,4 +1,4 @@
-# [PRODUCT NAME] — arkitektur
+# FRAME — arkitektur
 
 Status: **udkast til godkendelse.** Ingen kode bygges ud over bid 1, før dette
 dokument er godkendt. Dokumentet erstatter faserne i `docs/plan.md`, når det
@@ -13,8 +13,7 @@ noget en prompt håber på.
 
 ## Produkt og testdata
 
-**Produktnavn:** `PRODUCT_NAME = "[PRODUCT NAME]"` — en placeholder, indtil
-brandet er besluttet. Navnet står ét sted (`product.config.json`) og hentes
+**Produktnavn:** `PRODUCT_NAME = "FRAME"` (besluttet 2026-09-28). Navnet står ét sted (`product.config.json`) og hentes
 derfra af app, prototype og dokumentation. Et brand-skift ændrer ikke den
 funktionelle kerne.
 
@@ -467,7 +466,7 @@ på `generations` og `shots`.
 
 ```
 ┌───────────────────────────────────────────────────────────────────────┐
-│ [PRODUCT NAME]                         Golden Test Film  ▾        JN  │
+│ FRAME                         Golden Test Film  ▾        JN  │
 ├──────────────┬────────────────────────────────────────────────────────┤
 │ Brief      ✓ │  STORYBOARD                   [Gitter] [Tabel]  Filter │
 │ Manus      ✓ │  Scene 1 · Villavejen, morgen                          │

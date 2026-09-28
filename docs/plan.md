@@ -1,4 +1,4 @@
-# [PRODUCT NAME] — plan
+# FRAME — plan
 
 > **Bemærk:** `docs/arkitektur.md` (udkast) beskriver den fulde arkitektur og
 > MVP 1–5. Når den er godkendt, afløser den faserne herunder.

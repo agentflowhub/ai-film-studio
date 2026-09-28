@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react';
 import { useFilm } from '../lib/data.ts';
-import { PRODUCT_NAME } from '../lib/product.ts';
+import { PRODUCT_NAME, PRODUCT_TAGLINE } from '../lib/product.ts';
 import { href, type Route } from '../lib/router.ts';
 import { supabase } from '../lib/supabase.ts';
 import { texts } from '../lib/texts.ts';
@@ -33,7 +33,7 @@ export function Sidebar({ route, waiting }: { route: Route; waiting?: number }) 
     <nav className="sidebar" aria-label="Hovedmenu">
       <a className="brand" href="#/">
         <span className="brand-mark"><Icon d={ICONS.films} /></span>
-        <span className="brand-name">{PRODUCT_NAME}</span>
+        <span className="brand-text"><span className="brand-name">{PRODUCT_NAME}</span><span className="brand-tagline">{PRODUCT_TAGLINE}</span></span>
       </a>
       <div className="navgroup">
         {item({ name: 'films' }, 'films', 'Alle film', route.name === 'films' || route.name === 'new')}

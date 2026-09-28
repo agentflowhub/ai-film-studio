@@ -1,4 +1,5 @@
 {
-  "name": "[PRODUCT NAME]",
+  "name": "FRAME",
+  "tagline": "AI Film Studio",
   "definition": "Et AI-produktionssystem, hvor brugeren instruerer filmen på et menneskeligt niveau, mens systemet håndterer AI-generation, kontinuitet, referencesystem, prompts, modeller, approvals og produktionsstatus."
 }

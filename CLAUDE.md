@@ -1,4 +1,4 @@
-# CLAUDE.md — [PRODUCT NAME]
+# CLAUDE.md — FRAME
 
 Et AI-produktionssystem, hvor brugeren instruerer filmen på et menneskeligt niveau, mens systemet håndterer AI-generation, kontinuitet, referencesystem, prompts, modeller, approvals og produktionsstatus.
 
@@ -35,8 +35,7 @@ Plan og faser: `docs/plan.md`. Læs den relevante del, før du bygger noget nyt.
    køre uden forudgående godkendelse — heller ikke efter mange godkendelser.
 5. **Hemmeligheder** kun i Supabase secrets / miljøvariabler.
 6. **Produkt og testdata er adskilt.** Produktnavnet står kun i
-   `product.config.json` (`[PRODUCT NAME]`, indtil brandet er besluttet) — skriv
-   det aldrig direkte. Testkarakterer (fx Sander) findes kun i Golden Test
+   `product.config.json` (brand: FRAME) — skriv det aldrig direkte i koden. Testkarakterer (fx Sander) findes kun i Golden Test
    Case (`fixtures/golden-test-case/`) og i tests, aldrig som produktnavn,
    projektnavn, tabel, namespace, URL, API eller konfiguration.
    `tests/unit/brand-separation.test.ts` håndhæver det.

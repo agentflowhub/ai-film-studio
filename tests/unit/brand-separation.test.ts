@@ -29,9 +29,16 @@ function filesIn(dir: string): string[] {
 }
 
 describe('produktnavn', () => {
-  it('er en neutral placeholder, indtil brandet er besluttet', () => {
-    expect(PRODUCT_NAME).toBe('[PRODUCT NAME]');
+  it('kommer fra product.config.json og bruges af hele appen', () => {
+    expect(PRODUCT_NAME).toBe(product.name);
+    expect(PRODUCT_NAME).toBe('FRAME');
     expect(texts.appName).toBe(PRODUCT_NAME);
+  });
+
+  it('står ikke direkte i koden', () => {
+    for (const file of filesIn('src').filter((f) => !f.endsWith('product.ts'))) {
+      expect(readFileSync(join(ROOT, file), 'utf8'), file).not.toMatch(/\bFRAME\b/);
+    }
   });
 
   it('indeholder ikke navnet på nogen testkarakter', () => {
