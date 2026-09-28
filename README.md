@@ -1,0 +1,65 @@
+# AI Film Studio
+
+Et orkestreringslag, der fører en film fra idé til færdigt klip. Softwaren er
+**instruktøren og produktionslederen, ikke kameraet**: billed- og
+videogenerering kommer fra specialiserede modeller bag udskiftelige adaptere,
+og et menneske godkender hvert trin, før det næste bygger videre på det.
+
+```
+Idé → Film Brief → Storyboard → Karakterer → Locations → Props
+    → Shots → Startframes → Video → Klip → QA → Færdig film
+```
+
+Den fulde plan ligger i [`docs/plan.md`](docs/plan.md).
+
+## Status: bid 1 — Instruktøren
+
+Kun Claude, ingen betalt billed- eller videogenerering endnu.
+
+1. Brugeren opretter en film med titel og idé.
+2. **Interview**: budskab, målgruppe, følelse, længde og stil.
+3. **`brief-generate`** laver et struktureret Film Brief → *venter på godkendelse*.
+4. Brugeren godkender eller afviser. Afviser man, retter man svarene og laver et nyt.
+5. **`storyboard-generate`** laver scener og shots ud fra det godkendte brief,
+   med varigheder, der summerer præcis til filmens længde → *venter på godkendelse*.
+6. Når storyboardet er godkendt, er projektet klar til bid 2.
+
+## Stack
+
+React 18 + Vite + TypeScript (strict) · Supabase (Postgres, Edge Functions,
+Auth) · Claude API fra Edge Functions (`@anthropic-ai/sdk`, structured
+outputs) · Zod · Vitest.
+
+## Kom i gang
+
+```bash
+npm install
+cp .env.example .env.local        # udfyld VITE_SUPABASE_URL og VITE_SUPABASE_ANON_KEY
+supabase start
+supabase db reset                 # kører supabase/migrations
+supabase secrets set ANTHROPIC_API_KEY=...   # eller i supabase/functions/.env lokalt
+supabase functions serve
+npm run dev
+```
+
+## Kommandoer
+
+| Kommando | Hvad den gør |
+|---|---|
+| `npm run dev` | Frontend dev-server |
+| `npm run build` | Typecheck + produktionsbuild |
+| `npm run test` | Enhedstests (politik, timing, skemaer, Claude-adapter, fejltekster) |
+| `npm run test:db` | RLS- og godkendelsestests mod en rigtig Postgres (se `tests/db/README.md`) |
+| `npm run lint` | ESLint + TypeScript + `deno check` af Edge Functions |
+
+## Arkitektur i korte træk
+
+- **Alt arbejde er en opgave** (`tasks`) med idempotency-nøgle. En retry med
+  samme nøgle genoptager den samme opgave — den starter aldrig en ny generering.
+- **Godkendelse håndhæves i databasen.** Et brief eller storyboard kan
+  fysisk ikke få status `approved` uden en række i `approvals`, og et
+  storyboard kan ikke oprettes på et brief, der ikke er godkendt.
+- **Brugeren kan kun læse** produktionsdata. Alle skrivninger, der ændrer
+  status eller skaber AI-output, går gennem Edge Functions.
+- **Model pr. opgavetype** i `supabase/functions/_shared/model-config.ts`,
+  kan overskrives med `FILM_MODEL_<TYPE>` uden kodeændring.

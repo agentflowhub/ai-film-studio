@@ -1,0 +1,120 @@
+/* Lyst, roligt og Apple-inspireret — samme designsprog som agentFLOW. */
+:root {
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --text: #1d1d1f;
+  --muted: #6e6e73;
+  --line: #e5e5ea;
+  --accent: #0071e3;
+  --accent-hover: #0077ed;
+  --danger: #d70015;
+  --ok-bg: #e8f5ec;
+  --ok-text: #1b5e20;
+  --err-bg: #fdecec;
+  --radius: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+h1 { font-size: 28px; letter-spacing: -0.02em; margin: 0; }
+h2 { font-size: 20px; letter-spacing: -0.01em; margin: 0; }
+h3 { font-size: 15px; margin: 8px 0 0; }
+p { margin: 0; line-height: 1.5; }
+
+.shell { max-width: 880px; margin: 0 auto; padding: 24px 16px 64px; }
+.topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; }
+.brand { font-weight: 600; font-size: 17px; }
+.tagline { color: var(--muted); font-size: 13px; }
+
+.stack { display: flex; flex-direction: column; gap: 14px; }
+.row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.row.between { justify-content: space-between; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+.card.narrow { max-width: 420px; margin: 40px auto; }
+
+label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 500; flex: 1; }
+input, textarea, select {
+  font: inherit;
+  font-weight: 400;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fbfbfd;
+}
+input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+button {
+  font: inherit;
+  font-weight: 500;
+  border: none;
+  border-radius: 980px;
+  padding: 10px 20px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  align-self: flex-start;
+}
+button:hover { background: var(--accent-hover); }
+button:disabled { opacity: 0.5; cursor: default; }
+button.secondary { background: #e8e8ed; color: var(--text); }
+button.danger { background: var(--danger); }
+button.link { background: none; color: var(--accent); padding: 0; border-radius: 0; }
+
+.card.project {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  color: var(--text);
+  text-align: left;
+  border-radius: var(--radius);
+}
+.card.project:hover { background: #fafafa; }
+.project-title { font-weight: 600; }
+
+.pill {
+  display: inline-block;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 980px;
+  background: #e8e8ed;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.muted { color: var(--muted); font-size: 14px; }
+.lead { font-size: 17px; }
+.notice { background: var(--ok-bg); color: var(--ok-text); padding: 12px 14px; border-radius: 10px; }
+.error { background: var(--err-bg); color: var(--danger); padding: 12px 14px; border-radius: 10px; }
+.working::after { content: ''; animation: pulse 1.2s infinite; }
+@keyframes pulse { 50% { opacity: 0.4; } }
+
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; font-size: 14px; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; }
+.facts.small { font-size: 13px; }
+
+.characters, ol, ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.callout { background: #fff8e6; border-radius: 10px; padding: 12px 14px; }
+.decision { border-top: 1px solid var(--line); padding-top: 16px; }
+
+.scene { border-top: 1px solid var(--line); padding-top: 14px; }
+.shots { list-style: none; padding: 0; gap: 10px; }
+.shot { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.shot-head { display: flex; gap: 10px; align-items: center; font-size: 14px; }
+.dialogue { font-style: italic; }
+
+@media (max-width: 600px) {
+  .facts { grid-template-columns: 1fr; }
+  .facts dt { margin-top: 6px; }
+}

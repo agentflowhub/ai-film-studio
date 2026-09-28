@@ -1,0 +1,11 @@
+# Minimal konfiguration — kør `supabase init` for fulde standardværdier.
+project_id = "ai-film-studio"
+
+[functions.brief-generate]
+import_map = "./functions/deno.json"
+
+[functions.storyboard-generate]
+import_map = "./functions/deno.json"
+
+[functions.approval-decide]
+import_map = "./functions/deno.json"
