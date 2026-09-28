@@ -1,5 +1,6 @@
 // POST /approval-decide — et menneske godkender eller afviser et output
-// (brief eller storyboard).
+// (brief, Film DNA eller storyboard). Betalte generationer godkendes i
+// production-start (prisen) og generation-review (resultatet).
 //
 // Idempotent: samme beslutning to gange giver samme svar; en modsat
 // beslutning på en allerede afgjort opgave afvises. Virkningerne (status på
@@ -12,8 +13,9 @@ import { evaluateDecision, type TaskType } from '../_shared/policy.ts';
 import { serve } from '../_shared/runtime.ts';
 import { ApprovalDecideRequestSchema } from '../_shared/schemas.ts';
 
-const OUTPUT_TABLE: Partial<Record<TaskType, 'film_briefs' | 'storyboards'>> = {
+const OUTPUT_TABLE: Partial<Record<TaskType, 'film_briefs' | 'storyboards' | 'film_dna'>> = {
   'brief.generate': 'film_briefs',
+  'dna.generate': 'film_dna',
   'storyboard.generate': 'storyboards',
 };
 

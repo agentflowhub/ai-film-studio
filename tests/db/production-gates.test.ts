@@ -42,7 +42,10 @@ async function asset(s: Seed, kind = 'location', consent = kind === 'character' 
 }
 async function approveVersion(s: Seed, versionId: string) {
   const t = await task(s, 'asset.master_generate', { approve: true });
+  const m = await media(s);
   await as(db, service, async (c) => {
+    await c.query(`insert into public.generations(org_id, project_id, task_id, slot, asset_version_id, version, input, input_hash, cost_estimate_cents, status, output_media_id, review)
+      values ($1, $2, $3, 'reference', $4, 1, '{}', $5, 900, 'succeeded', $6, 'approved')`, [s.orgId, s.projectId, t, versionId, 'b'.repeat(64), m]);
     await c.query(`update public.asset_versions set task_id = $2, status = 'approved' where id = $1`, [versionId, t]);
   });
 }
@@ -91,12 +94,12 @@ describe('aktiver', () => {
     await as(db, service, (c) => c.query('update public.assets set master_version_id = $2 where id = $1', [a.assetId, a.versionId]));
   });
 
-  it('kan ikke godkende en version uden godkendelse af dens opgave', async () => {
+  it('kan ikke godkende en version, selv om prisen er godkendt, før referencerne er gennemset', async () => {
     const s = await seedOrgWithPendingBrief(db);
     const a = await asset(s);
-    const t = await task(s, 'asset.master_generate');
+    const t = await task(s, 'asset.master_generate', { approve: true });
     await expect(as(db, service, (c) => c.query(`update public.asset_versions set task_id = $2, status = 'approved' where id = $1`, [a.versionId, t])))
-      .rejects.toThrow(/uden en godkendelse/);
+      .rejects.toThrow(/gennemsete referencer/);
   });
 
   it('låser en godkendt version', async () => {
@@ -231,5 +234,23 @@ describe('Film DNA', () => {
     const s = await seedOrgWithPendingBrief(db);
     await expect(as(db, user(s.ownerId), (c) => c.query(`insert into public.film_rules(org_id, project_id, text) values ($1, $2, 'x')`, [s.orgId, s.projectId])))
       .rejects.toThrow(/permission denied/);
+  });
+});
+
+describe('budgetfunktioner', () => {
+  it('reserverer kun inden for budgettet — atomisk', async () => {
+    const s = await seedOrgWithPendingBrief(db);
+    const r = (cents: number) => as(db, service, (c) => q<{ ok: boolean }>(c, 'select public.reserve_budget($1, $2) as ok', [s.projectId, cents]).then((x) => x.ok));
+    expect(await r(30000)).toBe(true);
+    expect(await r(25000)).toBe(false);
+    expect(await r(20000)).toBe(true);
+    await as(db, service, (c) => c.query('select public.settle_budget($1, 2800, 2200)', [s.projectId]));
+    const b = await db.pool.query('select reserved_cents, spent_cents from public.project_budgets where project_id = $1', [s.projectId]);
+    expect(b.rows[0]).toEqual({ reserved_cents: 47200, spent_cents: 2200 });
+  });
+
+  it('kan ikke kaldes af en bruger', async () => {
+    const s = await seedOrgWithPendingBrief(db);
+    await expect(as(db, user(s.ownerId), (c) => c.query('select public.reserve_budget($1, 1)', [s.projectId]))).rejects.toThrow(/permission denied/);
   });
 });

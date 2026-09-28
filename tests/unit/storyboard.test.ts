@@ -20,7 +20,7 @@ function shot(duration: number) {
 
 function draft(...scenes: number[][]): StoryboardDraft {
   return {
-    assets: [{ key: 'hovedperson', kind: 'character' as const, name: 'Sander', role: 'Testkarakter', attributes: [{ name: 'Hår', value: 'gråt' }] }],
+    assets: [{ key: 'hovedperson', kind: 'character' as const, name: 'Sander', role: 'Testkarakter', attributes: [{ name: 'Hår', value: 'gråt', contradictions: ['blondt'] }] }],
     scenes: scenes.map((durations, i) => ({
       heading: `Scene ${i + 1}`,
       purpose: 'Etablerer Sander',

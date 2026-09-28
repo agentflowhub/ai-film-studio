@@ -21,6 +21,11 @@ export type ApiErrorCode =
   | 'approval_conflict'
   | 'storyboard_off_target'
   | 'generation_failed'
+  | 'not_ready'
+  | 'price_changed'
+  | 'over_budget'
+  | 'consent_missing'
+  | 'locked'
   | 'internal';
 
 export function json(body: unknown, status = 200): Response {

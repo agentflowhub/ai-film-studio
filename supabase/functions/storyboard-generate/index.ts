@@ -1,5 +1,9 @@
-// POST /storyboard-generate — godkendt Film Brief → storyboard med scener og
-// shots, til godkendelse.
+// POST /storyboard-generate — godkendt Film Brief → storyboard med aktiver,
+// scener og shots, til godkendelse.
+//
+// Storyboardet er filmens sandhedskilde: hvert shot kobles til de aktiv-
+// versioner (karakterer, locations, køretøjer, props), det bruger. Aktiverne
+// oprettes som kladder; de får master-referencer i Production Control.
 //
 // Kræver et godkendt brief: tjekkes her (canGenerateStoryboard) og igen af
 // databasen (trigger storyboards_require_approved_brief).
@@ -11,13 +15,14 @@ import { modelFor } from '../_shared/model-config.ts';
 import { canGenerateStoryboard } from '../_shared/policy.ts';
 import { STORYBOARD_SYSTEM_PROMPT, storyboardUserMessage } from '../_shared/prompts.ts';
 import { serve } from '../_shared/runtime.ts';
-import { FilmBriefSchema, StoryboardDraftSchema, StoryboardGenerateRequestSchema } from '../_shared/schemas.ts';
+import { shotAssetRole, toAssetRows } from '../_shared/assets.ts';
+import { BriefAnswersSchema, FilmBriefSchema, StoryboardDraftSchema, StoryboardGenerateRequestSchema, unknownAssetKeys } from '../_shared/schemas.ts';
 import { fitToDuration, flattenShots } from '../_shared/storyboard.ts';
 
 serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, userId, body, env, anthropic }) => {
   const brief = await admin
     .from('film_briefs')
-    .select('id, org_id, project_id, task_id, status, content, projects!inner(stage)')
+    .select('id, org_id, project_id, task_id, status, content, answers, projects!inner(stage)')
     .eq('id', body.brief_id)
     .maybeSingle();
   if (brief.error) throw brief.error;
@@ -50,6 +55,12 @@ serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, us
   if (pending.data.length > 0) return apiError('already_pending', 409);
 
   const filmBrief = FilmBriefSchema.parse(brief.data.content);
+  const answers = BriefAnswersSchema.safeParse(brief.data.answers);
+  const shotCount = answers.success ? answers.data.shot_count : undefined;
+  // Nyeste Film DNA (godkendt, hvis der er en) følger med som stilgrundlag.
+  const dnaRows = await admin.from('film_dna').select('fields, status').eq('project_id', projectId).order('version', { ascending: false });
+  if (dnaRows.error) throw dnaRows.error;
+  const dna = (dnaRows.data.find((d) => d.status === 'approved') ?? dnaRows.data[0])?.fields as Record<string, string> | undefined;
 
   const config = modelFor('storyboard.generate', env);
   const claim = await claimTask(admin, {
@@ -75,7 +86,7 @@ serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, us
     const generated = await generateStructured(anthropic().beta.messages, {
       config,
       system: STORYBOARD_SYSTEM_PROMPT,
-      user: storyboardUserMessage(filmBrief, filmBrief.duration_seconds),
+      user: storyboardUserMessage(filmBrief, dna ?? null, filmBrief.duration_seconds, shotCount),
       schema: StoryboardDraftSchema,
     });
     await recordUsage(admin, { orgId, taskId: task.id, model: generated.model, ...generated.usage });
@@ -86,6 +97,13 @@ serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, us
       await markTaskFailed(admin, task.id, failure);
       log('warn', 'storyboard.generate.off_target', { task_id: task.id, total: fitted.total });
       return apiError('storyboard_off_target', 502, { task_id: task.id, retryable: true });
+    }
+
+    const unknown = unknownAssetKeys(fitted.draft);
+    if (unknown.length) {
+      const failure = { code: 'invalid_output', message: `shots peger på ukendte aktiver: ${unknown.join(', ')}`, retryable: true };
+      await markTaskFailed(admin, task.id, failure);
+      return apiError('generation_failed', 502, { task_id: task.id, reason: failure.code, retryable: true });
     }
 
     const version = await nextVersion(admin, 'storyboards', projectId);
@@ -104,16 +122,58 @@ serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, us
       .single();
     if (storyboard.error) throw storyboard.error;
 
-    const shots = flattenShots(fitted.draft).map((shot) => ({
-      ...shot,
-      org_id: orgId,
-      storyboard_id: storyboard.data.id,
-    }));
-    const insertedShots = await admin.from('shots').insert(shots);
-    if (insertedShots.error) {
-      // Et storyboard uden shots må ikke stå tilbage som et gyldigt resultat.
+    const createdAssets: string[] = [];
+    try {
+      // Aktiver: genbrug et eksisterende aktiv med samme type og navn (fx ved et
+      // nyt storyboard efter en afvisning); ellers opret et nyt som kladde.
+      const existing = await admin
+        .from('assets')
+        .select('id, code, kind, name, asset_versions(id, version)')
+        .eq('project_id', projectId);
+      if (existing.error) throw existing.error;
+      const rows = toAssetRows(fitted.draft.assets, new Set(existing.data.map((a) => a.code as string)));
+      const byKey = new Map<string, { assetId: string; versionId: string; kind: typeof rows[number]['kind'] }>();
+      for (const row of rows) {
+        const match = existing.data.find((a) => a.kind === row.kind && String(a.name).toLowerCase() === row.name.toLowerCase());
+        if (match) {
+          const versions = (match.asset_versions as { id: string; version: number }[]).sort((x, y) => y.version - x.version);
+          byKey.set(row.key, { assetId: match.id, versionId: versions[0]!.id, kind: row.kind });
+          continue;
+        }
+        const asset = await admin
+          .from('assets')
+          .insert({ org_id: orgId, project_id: projectId, kind: row.kind, code: row.code, name: row.name, role: row.role, consent_status: row.consent_status })
+          .select('id')
+          .single();
+        if (asset.error) throw asset.error;
+        createdAssets.push(asset.data.id);
+        const v = await admin
+          .from('asset_versions')
+          .insert({ org_id: orgId, asset_id: asset.data.id, version: 1, attributes: row.attributes, continuity_rules: row.continuity_rules })
+          .select('id')
+          .single();
+        if (v.error) throw v.error;
+        byKey.set(row.key, { assetId: asset.data.id, versionId: v.data.id, kind: row.kind });
+      }
+
+      const flat = flattenShots(fitted.draft);
+      const insertedShots = await admin
+        .from('shots')
+        .insert(flat.map(({ asset_keys: _keys, ...shot }) => ({ ...shot, org_id: orgId, storyboard_id: storyboard.data.id })))
+        .select('id, code');
+      if (insertedShots.error) throw insertedShots.error;
+      const shotIdByCode = new Map(insertedShots.data.map((r) => [r.code as string, r.id as string]));
+      const links = flat.flatMap((shot) => shot.asset_keys.map((key) => {
+        const a = byKey.get(key)!;
+        return { org_id: orgId, shot_id: shotIdByCode.get(shot.code)!, asset_id: a.assetId, asset_version_id: a.versionId, role: shotAssetRole(a.kind) };
+      }));
+      const linked = await admin.from('shot_assets').insert(links);
+      if (linked.error) throw linked.error;
+    } catch (err) {
+      // Et storyboard uden shots og aktiver må ikke stå tilbage som et gyldigt resultat.
       await admin.from('storyboards').delete().eq('id', storyboard.data.id);
-      throw insertedShots.error;
+      if (createdAssets.length) await admin.from('assets').delete().in('id', createdAssets);
+      throw err;
     }
 
     const done = await admin
@@ -126,7 +186,7 @@ serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, us
       .eq('id', task.id);
     if (done.error) throw done.error;
 
-    log('info', 'storyboard.generate.done', { task_id: task.id, storyboard_id: storyboard.data.id, shots: shots.length });
+    log('info', 'storyboard.generate.done', { task_id: task.id, storyboard_id: storyboard.data.id });
     return json({ task_id: task.id, storyboard_id: storyboard.data.id, replayed: false }, 201);
   } catch (err) {
     const failure =

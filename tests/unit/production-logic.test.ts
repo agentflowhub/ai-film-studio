@@ -66,9 +66,11 @@ describe('kontinuitetsmotor', () => {
     expect(consequence(c!)).toContain('ikke ser ens ud gennem filmen');
   });
 
-  it('bygger et mønster af Claudes trigger-ord', () => {
+  it('bygger et mønster af Claudes trigger-ord, som motoren selv kan bruge', () => {
     const p = patternFromWords(['drone', 'luftfoto'])!;
-    expect(new RegExp(p, 'iu').test('Dronen følger ham')).toBe(true);
+    const c = findConflicts({ action: 'Dronen følger ham.', notes: null }, [], [{ id: 'r', text: 'Ingen droner', pattern: p, reason: null, enabled: true }]);
+    expect(c).toHaveLength(1);
+    expect(c[0]).toMatchObject({ shotValue: 'Dronen' });
     expect(patternFromWords([])).toBeNull();
   });
 

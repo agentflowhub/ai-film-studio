@@ -1,8 +1,10 @@
-// POST /brief-generate — idé + interview-svar → Film Brief til godkendelse.
+// POST /brief-generate — idé + interview-svar → Film Brief, Film DNA og
+// filmregler til godkendelse.
 //
-// Et tekst-trin: kører uden forudgående godkendelse, men resultatet lander
-// som 'pending_approval', og storyboardet kan først laves, når et menneske
-// har godkendt briefet (approval-decide).
+// Et tekst-trin: kører uden forudgående godkendelse, men briefet og Film DNA
+// lander hver som 'pending_approval' med deres egen opgave, så de kan
+// godkendes hver for sig (approval-decide). Filmregler er forslag, brugeren
+// slår til og fra; de kræver ikke godkendelse.
 
 import { generateStructured, GenerateError } from '../_shared/claude.ts';
 import { claimTask, isOrgMember, markTaskFailed, nextVersion, recordUsage } from '../_shared/db.ts';
@@ -10,7 +12,8 @@ import { apiError, json, log } from '../_shared/http.ts';
 import { modelFor } from '../_shared/model-config.ts';
 import { BRIEF_SYSTEM_PROMPT, briefUserMessage } from '../_shared/prompts.ts';
 import { serve } from '../_shared/runtime.ts';
-import { BriefGenerateRequestSchema, FilmBriefSchema } from '../_shared/schemas.ts';
+import { patternFromWords } from '../_shared/continuity.ts';
+import { BriefGenerateRequestSchema, BriefPackageSchema, dnaFields } from '../_shared/schemas.ts';
 
 serve('brief-generate', BriefGenerateRequestSchema, async ({ admin, userId, body, env, anthropic }) => {
   const project = await admin
@@ -24,6 +27,7 @@ serve('brief-generate', BriefGenerateRequestSchema, async ({ admin, userId, body
     return apiError('not_found', 404);
   }
   const orgId: string = project.data.org_id;
+  const projectId: string = project.data.id;
 
   if (project.data.stage !== 'briefing') return apiError('wrong_stage', 409);
 
@@ -64,11 +68,11 @@ serve('brief-generate', BriefGenerateRequestSchema, async ({ admin, userId, body
       config,
       system: BRIEF_SYSTEM_PROMPT,
       user: briefUserMessage(body.answers),
-      schema: FilmBriefSchema,
+      schema: BriefPackageSchema,
     });
 
     // Længden er kundens valg, ikke modellens.
-    const content = { ...generated.data, duration_seconds: body.answers.duration_seconds };
+    const content = { ...generated.data.brief, duration_seconds: body.answers.duration_seconds };
 
     const version = await nextVersion(admin, 'film_briefs', project.data.id);
     const brief = await admin
@@ -85,10 +89,40 @@ serve('brief-generate', BriefGenerateRequestSchema, async ({ admin, userId, body
       .single();
     if (brief.error) throw brief.error;
 
+    // Film DNA får sin egen opgave, så den kan godkendes for sig.
+    const dnaTask = await admin
+      .from('tasks')
+      .insert({
+        org_id: orgId, project_id: project.data.id, type: 'dna.generate', status: 'pending_approval',
+        idempotency_key: `${body.idempotency_key}:dna`, payload: { brief_task_id: task.id }, created_by: userId, model: generated.model,
+      })
+      .select('id')
+      .single();
+    if (dnaTask.error) throw dnaTask.error;
+    const dnaVersion = await nextVersion(admin, 'film_dna', project.data.id);
+    const dna = await admin
+      .from('film_dna')
+      .insert({ org_id: orgId, project_id: project.data.id, version: dnaVersion, fields: dnaFields(generated.data.film_dna), task_id: dnaTask.data.id })
+      .select('id')
+      .single();
+    if (dna.error) throw dna.error;
+    await admin.from('tasks').update({ result: { film_dna_id: dna.data.id } }).eq('id', dnaTask.data.id);
+
+    // Regler foreslås kun, når filmen ikke har nogen endnu — brugerens egne
+    // valg overskrives aldrig af et nyt forslag.
+    const existingRules = await admin.from('film_rules').select('id', { count: 'exact', head: true }).eq('project_id', project.data.id);
+    if (existingRules.error) throw existingRules.error;
+    if (!existingRules.count && generated.data.film_rules.length) {
+      const rules = await admin.from('film_rules').insert(generated.data.film_rules.map((r) => ({
+        org_id: orgId, project_id: projectId, text: r.text, reason: r.reason, pattern: patternFromWords(r.trigger_words),
+      })));
+      if (rules.error) throw rules.error;
+    }
+
     // Resultatet skrives i samme opdatering som statusskiftet — aldrig efter.
     const done = await admin
       .from('tasks')
-      .update({ status: 'pending_approval', result: { brief_id: brief.data.id }, model: generated.model })
+      .update({ status: 'pending_approval', result: { brief_id: brief.data.id, film_dna_id: dna.data.id }, model: generated.model })
       .eq('id', task.id);
     if (done.error) throw done.error;
 

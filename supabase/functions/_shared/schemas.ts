@@ -122,7 +122,12 @@ export const AssetDraftSchema = z.object({
   name: z.string().min(1).max(120),
   role: z.string().min(1).max(200),
   // Liste frem for et frit objekt, så skemaet virker som structured output.
-  attributes: z.array(z.object({ name: z.string().min(1).max(40), value: z.string().min(1).max(200) })).min(1).max(12),
+  attributes: z.array(z.object({
+    name: z.string().min(1).max(40),
+    value: z.string().min(1).max(200),
+    // Ord, der i et shot ville modsige attributten (fx en anden slags hovedbeklædning).
+    contradictions: z.array(z.string().min(2).max(40)).max(8),
+  })).min(1).max(12),
 });
 export type AssetDraft = z.infer<typeof AssetDraftSchema>;
 
@@ -185,3 +190,88 @@ export const ApprovalDecideRequestSchema = z.object({
   comment: z.string().trim().max(2000).optional(),
 });
 export type ApprovalDecideRequest = z.infer<typeof ApprovalDecideRequestSchema>;
+
+// ---------------------------------------------------------------------------
+// Request-skemaer for MVP 1's Edge Functions
+// ---------------------------------------------------------------------------
+
+export const DnaReviseRequestSchema = z.object({
+  project_id: z.uuid(),
+  idempotency_key: IdempotencyKey,
+  fields: z.record(z.enum(DNA_FIELDS), z.string().trim().min(1).max(300)),
+});
+
+export const FilmRulesUpdateRequestSchema = z.object({
+  project_id: z.uuid(),
+  add: z.array(z.object({ text: z.string().trim().min(1).max(200), trigger_words: z.array(z.string().trim().min(2).max(40)).max(8).default([]) })).max(5).default([]),
+  toggle: z.array(z.object({ id: z.uuid(), enabled: z.boolean() })).max(30).default([]),
+});
+
+export const AssetSaveRequestSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('create'), project_id: z.uuid(), kind: z.enum(ASSET_KINDS), name: z.string().trim().min(1).max(120), role: z.string().trim().max(200).optional() }),
+  z.object({ action: z.literal('new_version'), asset_id: z.uuid(), note: z.string().trim().max(300).optional() }),
+  z.object({ action: z.literal('edit_draft'), asset_version_id: z.uuid(), attributes: z.record(z.string().min(1).max(40), z.string().max(200)) }),
+  z.object({ action: z.literal('confirm_consent'), asset_id: z.uuid() }),
+  z.object({ action: z.literal('set_master'), asset_version_id: z.uuid() }),
+]);
+
+export const ShotUpdateRequestSchema = z.object({
+  shot_id: z.uuid(),
+  changes: z.object({
+    action: z.string().trim().min(1).max(800),
+    dialogue: z.string().trim().max(800).nullable(),
+    notes: z.string().trim().max(800).nullable(),
+    duration_seconds: z.number().min(1).max(15),
+    shot_type: z.enum(SHOT_TYPES),
+    lens_mm: z.number().int().min(8).max(600).nullable(),
+    movement: z.enum(MOVEMENTS),
+    performance: z.string().trim().max(80).nullable(),
+    lighting: z.string().trim().max(200).nullable(),
+  }).partial(),
+});
+
+export const ShotContinuityRequestSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('fix'), shot_id: z.uuid(), conflict_key: z.string().min(3).max(200) }),
+  z.object({ action: z.literal('allow'), shot_id: z.uuid(), conflict_key: z.string().min(3).max(200), reason: z.string().trim().max(300).optional() }),
+  z.object({ action: z.literal('undo'), shot_id: z.uuid(), fix_id: z.uuid() }),
+  z.object({ action: z.literal('update_ref'), shot_id: z.uuid(), asset_id: z.uuid() }),
+  z.object({ action: z.literal('pin_ref'), shot_id: z.uuid(), asset_id: z.uuid() }),
+]);
+
+export const ProductionItemSchema = z.discriminatedUnion('slot', [
+  z.object({ slot: z.literal('reference'), asset_version_id: z.uuid() }),
+  z.object({ slot: z.enum(['start_frame', 'video']), shot_id: z.uuid(), choice: z.string().max(120).nullable().optional() }),
+]);
+export type ProductionItem = z.infer<typeof ProductionItemSchema>;
+
+export const ProductionPlanRequestSchema = z.object({ project_id: z.uuid() });
+
+export const ProductionStartRequestSchema = z.object({
+  project_id: z.uuid(),
+  idempotency_key: IdempotencyKey,
+  items: z.array(ProductionItemSchema).min(1).max(60),
+  // Det beløb, brugeren så og sagde ja til. Afviger den aktuelle pris, afvises kaldet.
+  expected_total_cents: z.number().int().min(0),
+});
+
+export const GenerationReviewRequestSchema = z.object({
+  generation_id: z.uuid(),
+  decision: z.enum(['approved', 'rejected']),
+  comment: z.string().trim().max(1000).optional(),
+});
+
+export const MediaUploadRequestSchema = z.discriminatedUnion('action', [
+  z.object({
+    action: z.literal('sign'),
+    asset_version_id: z.uuid(),
+    role: z.string().regex(/^[a-z_]{2,30}$/),
+    mime: z.enum(['image/png', 'image/jpeg', 'image/webp']),
+    bytes: z.number().int().min(1).max(20 * 1024 * 1024),
+  }),
+  z.object({
+    action: z.literal('register'),
+    asset_version_id: z.uuid(),
+    role: z.string().regex(/^[a-z_]{2,30}$/),
+    path: z.string().min(10).max(300),
+  }),
+]);

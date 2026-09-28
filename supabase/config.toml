@@ -9,3 +9,33 @@ import_map = "./functions/deno.json"
 
 [functions.approval-decide]
 import_map = "./functions/deno.json"
+
+[functions.production-plan]
+import_map = "./functions/deno.json"
+
+[functions.production-start]
+import_map = "./functions/deno.json"
+
+[functions.generation-worker]
+import_map = "./functions/deno.json"
+# Kaldes af pg_cron med x-worker-secret, ikke af en bruger.
+verify_jwt = false
+
+[functions.generation-review]
+import_map = "./functions/deno.json"
+
+[functions.asset-save]
+import_map = "./functions/deno.json"
+
+[functions.shot-update]
+import_map = "./functions/deno.json"
+
+[functions.shot-continuity]
+import_map = "./functions/deno.json"
+
+[functions.film-rules-update]
+import_map = "./functions/deno.json"
+
+[functions.media-upload]
+import_map = "./functions/deno.json"
+

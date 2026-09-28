@@ -43,9 +43,11 @@ export type Conflict =
   | { kind: 'attribute'; key: string; assetId: string; assetName: string; version: number; attribute: string; masterValue: string; shotValue: string; allowed: boolean }
   | { kind: 'rule'; key: string; ruleId: string; ruleText: string; reason: string | null; shotValue: string; allowed: boolean };
 
-function safeRegExp(pattern: string, flags = 'i'): RegExp | null {
+// Altid store/små-bogstav-ufølsomt og Unicode (mønstrene bruger \p{L} for danske bogstaver).
+export function safeRegExp(pattern: string, flags = 'i'): RegExp | null {
+  const f = [...new Set([...flags.replace(/[gy]/g, ''), 'i', 'u'])].join('');
   try {
-    return new RegExp(pattern, flags.includes('i') ? flags : flags + 'i');
+    return new RegExp(pattern, f);
   } catch {
     return null;
   }

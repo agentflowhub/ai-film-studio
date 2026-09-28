@@ -67,6 +67,37 @@ npm run dev
 | `npm run lint` | ESLint + TypeScript + `deno check` af Edge Functions |
 | `npm run prototype:build` | Bygger prototypen fra `prototype/src` med produktnavn og Golden Test Case |
 
+## MVP 1 — status
+
+Backend for hele produktionskæden er bygget (migration 002–003 og Edge
+Functions); brugerfladen er næste skridt.
+
+| Edge Function | Hvad den gør |
+|---|---|
+| `brief-generate` | Idé → Film Brief, Film DNA og filmregler (Claude) |
+| `approval-decide` | Godkend/afvis brief, Film DNA og storyboard |
+| `storyboard-generate` | Godkendt brief → storyboard, aktiver og shots koblet til aktiv-versioner (Claude) |
+| `asset-save` | Opret aktiv, ny version, ret kladde, samtykke, vælg master |
+| `media-upload` | Upload egne referencebilleder til en kladde |
+| `shot-update` | Ret et shots instruktion og spec |
+| `shot-continuity` | Ret automatisk, tillad afvigelse, fortryd, opdatér/behold aktiv-version |
+| `film-rules-update` | Tilføj filmregler, slå dem til og fra |
+| `production-plan` | Production Control: status, porte, anbefalet model og pakker med pris |
+| `production-start` | "Godkend produktion": reservér budget og sæt generationer i kø |
+| `generation-worker` | Kører køen: submit, følg, failover, gem resultat, bogfør pris |
+| `generation-review` | Godkend/afvis et resultat (startframe, video, master-referencer) |
+
+**Providere:** indtil de rigtige billed- og videoprovidere er valgt, kører
+produktionen mod en simulator bag samme interface
+(`ALLOW_SIMULATOR_PROVIDER=true`). Den kan aldrig bruges, når
+`APP_ENV=production`, og dens resultater gemmes som tydeligt mærkede
+pladsholdere.
+
+**Worker:** `generation-worker` skal kaldes hvert minut af pg_cron (via
+pg_net) med headeren `x-worker-secret: $WORKER_SECRET`. Opsætningen er
+miljøspecifik (projekt-URL og hemmelighed) og ligger derfor ikke i en
+migration.
+
 ## Arkitektur i korte træk
 
 - **Alt arbejde er en opgave** (`tasks`) med idempotency-nøgle. En retry med

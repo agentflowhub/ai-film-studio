@@ -147,7 +147,7 @@ export async function recordUsage(
   });
 }
 
-export async function nextVersion(admin: Admin, table: 'film_briefs' | 'storyboards', projectId: string): Promise<number> {
+export async function nextVersion(admin: Admin, table: 'film_briefs' | 'storyboards' | 'film_dna', projectId: string): Promise<number> {
   const { data, error } = await admin
     .from(table)
     .select('version')

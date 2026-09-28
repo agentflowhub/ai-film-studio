@@ -38,6 +38,8 @@ export interface PromptInput {
   shot: PromptShot;
   assets: PromptAsset[];
   deviations: PromptDeviation[];
+  // For video: den godkendte startframe, videoen bygger på. Skiftes den, er videoen forældet.
+  startFrameId?: string | null;
 }
 
 export interface CompiledPrompt {
@@ -85,6 +87,10 @@ export function compilePrompt(input: PromptInput): CompiledPrompt {
 }
 
 export async function sha256Hex(text: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return sha256Bytes(new TextEncoder().encode(text));
+}
+
+export async function sha256Bytes(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
