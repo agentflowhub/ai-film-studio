@@ -96,3 +96,20 @@ describe('flattenShots', () => {
     expect(flattenShots(d)[0]!.dialogue).toBeNull();
   });
 });
+
+describe('objektiv uden for databasens grænser', () => {
+  it('udelades i stedet for at afvise storyboardet', async () => {
+    const { flattenShots } = await import('../../supabase/functions/_shared/storyboard.ts');
+    const shot = { duration_seconds: 3, shot_type: 'wide' as const, movement: 'static' as const, camera: 'k', action: 'a', dialogue: null, performance: null, lighting: null, audio: null, asset_keys: ['x'] };
+    const flat = flattenShots({ assets: [], scenes: [{ heading: 'h', purpose: 'p', shots: [{ ...shot, lens_mm: 4 }, { ...shot, lens_mm: 50 }, { ...shot, lens_mm: 1200 }] }] });
+    expect(flat.map((s) => s.lens_mm)).toEqual([null, 50, null]);
+  });
+});
+
+describe('errorText', () => {
+  it('skriver databasefejl ud i stedet for [object Object]', async () => {
+    const { errorText } = await import('../../supabase/functions/_shared/http.ts');
+    expect(errorText({ code: '23514', message: 'new row violates check constraint "x"', details: null, hint: null })).toBe('23514 · new row violates check constraint "x"');
+    expect(errorText(new Error('boom'))).toBe('boom');
+  });
+});

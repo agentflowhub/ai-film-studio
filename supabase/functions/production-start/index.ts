@@ -11,7 +11,7 @@
 //   * Samme idempotency-nøgle starter aldrig produktionen to gange.
 
 import { isOrgMember } from '../_shared/db.ts';
-import { apiError, json, log } from '../_shared/http.ts';
+import { apiError, errorText, json, log } from '../_shared/http.ts';
 import { planProject, referencePrompt, type PackageItem } from '../_shared/plan.ts';
 import { sha256Hex } from '../_shared/prompt.ts';
 import { createRegistry } from '../_shared/providers/registry.ts';
@@ -133,7 +133,7 @@ serve('production-start', ProductionStartRequestSchema, async ({ admin, userId, 
     if (batch.data) {
       const children = await admin.from('tasks').select('id').eq('parent_task_id', batch.data.id);
       if (children.data?.length) await admin.from('generations').update({ status: 'cancelled' }).in('task_id', children.data.map((c) => c.id)).eq('status', 'queued');
-      await admin.from('tasks').update({ status: 'failed', error: { code: 'internal', message: err instanceof Error ? err.message : String(err) } }).eq('id', batch.data.id);
+      await admin.from('tasks').update({ status: 'failed', error: { code: 'internal', message: errorText(err) } }).eq('id', batch.data.id);
     }
     throw err;
   }

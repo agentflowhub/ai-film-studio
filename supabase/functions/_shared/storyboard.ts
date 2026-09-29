@@ -95,7 +95,8 @@ export function flattenShots(draft: StoryboardDraft): FlatShot[] {
       shot_number: shotIndex + 1,
       duration_seconds: shot.duration_seconds,
       shot_type: shot.shot_type,
-      lens_mm: shot.lens_mm,
+      // Databasen tillader 8–600 mm; et urealistisk objektiv fra Claude udelades hellere end at afvise storyboardet.
+      lens_mm: shot.lens_mm !== null && shot.lens_mm >= 8 && shot.lens_mm <= 600 ? shot.lens_mm : null,
       movement: shot.movement,
       camera: shot.camera,
       action: shot.action,

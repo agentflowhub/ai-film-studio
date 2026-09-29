@@ -54,3 +54,20 @@ export async function readJson(req: Request): Promise<unknown> {
     return undefined;
   }
 }
+
+// En fejl som læsbar tekst. Databasefejl fra supabase-js er almindelige
+// objekter (code, message, details, hint) — String() ville give "[object Object]".
+export function errorText(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object') {
+    const e = err as Record<string, unknown>;
+    const parts = [e.code, e.message, e.details, e.hint].filter((x) => typeof x === 'string' && x.length > 0);
+    if (parts.length) return parts.join(' · ').slice(0, 500);
+    try {
+      return JSON.stringify(err).slice(0, 500);
+    } catch {
+      return 'ukendt fejl';
+    }
+  }
+  return String(err);
+}

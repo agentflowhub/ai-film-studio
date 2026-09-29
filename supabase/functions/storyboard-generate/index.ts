@@ -10,7 +10,7 @@
 
 import { generateStructured, GenerateError } from '../_shared/claude.ts';
 import { claimTask, isOrgMember, markTaskFailed, nextVersion, recordUsage } from '../_shared/db.ts';
-import { apiError, json, log } from '../_shared/http.ts';
+import { apiError, errorText, json, log } from '../_shared/http.ts';
 import { modelFor } from '../_shared/model-config.ts';
 import { canGenerateStoryboard } from '../_shared/policy.ts';
 import { STORYBOARD_SYSTEM_PROMPT, storyboardUserMessage } from '../_shared/prompts.ts';
@@ -120,7 +120,7 @@ serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, us
       })
       .select('id')
       .single();
-    if (storyboard.error) throw storyboard.error;
+    if (storyboard.error) throw step('storyboard', storyboard.error);
 
     const createdAssets: string[] = [];
     try {
@@ -130,7 +130,7 @@ serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, us
         .from('assets')
         .select('id, code, kind, name, asset_versions(id, version)')
         .eq('project_id', projectId);
-      if (existing.error) throw existing.error;
+      if (existing.error) throw step('aktiver (læs)', existing.error);
       const rows = toAssetRows(fitted.draft.assets, new Set(existing.data.map((a) => a.code as string)));
       const byKey = new Map<string, { assetId: string; versionId: string; kind: typeof rows[number]['kind'] }>();
       for (const row of rows) {
@@ -145,14 +145,14 @@ serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, us
           .insert({ org_id: orgId, project_id: projectId, kind: row.kind, code: row.code, name: row.name, role: row.role, consent_status: row.consent_status })
           .select('id')
           .single();
-        if (asset.error) throw asset.error;
+        if (asset.error) throw step(`aktiv ${row.code}`, asset.error);
         createdAssets.push(asset.data.id);
         const v = await admin
           .from('asset_versions')
           .insert({ org_id: orgId, asset_id: asset.data.id, version: 1, attributes: row.attributes, continuity_rules: row.continuity_rules })
           .select('id')
           .single();
-        if (v.error) throw v.error;
+        if (v.error) throw step(`aktiv-version ${row.code}`, v.error);
         byKey.set(row.key, { assetId: asset.data.id, versionId: v.data.id, kind: row.kind });
       }
 
@@ -161,14 +161,14 @@ serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, us
         .from('shots')
         .insert(flat.map(({ asset_keys: _keys, ...shot }) => ({ ...shot, org_id: orgId, storyboard_id: storyboard.data.id })))
         .select('id, code');
-      if (insertedShots.error) throw insertedShots.error;
+      if (insertedShots.error) throw step('shots', insertedShots.error);
       const shotIdByCode = new Map(insertedShots.data.map((r) => [r.code as string, r.id as string]));
       const links = flat.flatMap((shot) => shot.asset_keys.map((key) => {
         const a = byKey.get(key)!;
         return { org_id: orgId, shot_id: shotIdByCode.get(shot.code)!, asset_id: a.assetId, asset_version_id: a.versionId, role: shotAssetRole(a.kind) };
       }));
       const linked = await admin.from('shot_assets').insert(links);
-      if (linked.error) throw linked.error;
+      if (linked.error) throw step('shot-aktiver', linked.error);
     } catch (err) {
       // Et storyboard uden shots og aktiver må ikke stå tilbage som et gyldigt resultat.
       await admin.from('storyboards').delete().eq('id', storyboard.data.id);
@@ -184,7 +184,7 @@ serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, us
         model: generated.model,
       })
       .eq('id', task.id);
-    if (done.error) throw done.error;
+    if (done.error) throw step('opgave', done.error);
 
     log('info', 'storyboard.generate.done', { task_id: task.id, storyboard_id: storyboard.data.id });
     return json({ task_id: task.id, storyboard_id: storyboard.data.id, replayed: false }, 201);
@@ -192,9 +192,14 @@ serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, us
     const failure =
       err instanceof GenerateError
         ? { code: err.code, message: err.message, retryable: err.retryable }
-        : { code: 'internal', message: err instanceof Error ? err.message : String(err), retryable: true };
+        : { code: 'internal', message: errorText(err), retryable: true };
     await markTaskFailed(admin, task.id, failure);
     log('error', 'storyboard.generate.failed', { task_id: task.id, code: failure.code, reason: failure.message });
     return apiError('generation_failed', 502, { task_id: task.id, reason: failure.code, retryable: failure.retryable });
   }
 });
+
+// Hvilket trin, der fejlede, følger med i fejlen på opgaven.
+function step(name: string, err: unknown): Error {
+  return new Error(`${name}: ${errorText(err)}`);
+}

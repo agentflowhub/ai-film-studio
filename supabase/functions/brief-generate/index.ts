@@ -8,7 +8,7 @@
 
 import { generateStructured, GenerateError } from '../_shared/claude.ts';
 import { claimTask, isOrgMember, markTaskFailed, nextVersion, recordUsage } from '../_shared/db.ts';
-import { apiError, json, log } from '../_shared/http.ts';
+import { apiError, errorText, json, log } from '../_shared/http.ts';
 import { modelFor } from '../_shared/model-config.ts';
 import { BRIEF_SYSTEM_PROMPT, briefUserMessage } from '../_shared/prompts.ts';
 import { serve } from '../_shared/runtime.ts';
@@ -134,7 +134,7 @@ serve('brief-generate', BriefGenerateRequestSchema, async ({ admin, userId, body
     const failure =
       err instanceof GenerateError
         ? { code: err.code, message: err.message, retryable: err.retryable }
-        : { code: 'internal', message: err instanceof Error ? err.message : String(err), retryable: true };
+        : { code: 'internal', message: errorText(err), retryable: true };
     await markTaskFailed(admin, task.id, failure);
     log('error', 'brief.generate.failed', { task_id: task.id, code: failure.code, reason: failure.message });
     return apiError('generation_failed', 502, { task_id: task.id, reason: failure.code, retryable: failure.retryable });
