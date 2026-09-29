@@ -6,7 +6,7 @@ import { FilmHeader } from '../components/Shell.tsx';
 import { Button, Empty, Faces, Notice, Progress, StatusPill, Thumb } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { outputFor, primaryReferenceUrl, useFilm, type FilmData } from '../lib/data.ts';
-import { ago, allPackages, assetsFor, packageTotal, planFor, readiness, recentActivity, spentCents, timecodes } from '../lib/derive.ts';
+import { ago, allPackages, lastProblem, assetsFor, packageTotal, planFor, readiness, recentActivity, spentCents, timecodes } from '../lib/derive.ts';
 import { useRun } from '../lib/flash.ts';
 import { IdempotencyKey } from '../lib/idempotency.ts';
 import { go, href } from '../lib/router.ts';
@@ -68,9 +68,11 @@ function StoryboardGate({ d }: { d: FilmData }) {
   }
   if (!sb || sb.status === 'rejected') {
     const working = d.busy && !sb;
+    const problem = working ? null : lastProblem(d.tasks, 'storyboard.generate');
     return (
       <Empty title={sb ? 'Storyboardet blev afvist' : 'Klar til storyboard'}>
-        <p className="muted">Instruktøren deler filmen op i scener og shots, finder karakterer, locations og props og tjekker kontinuiteten mod filmreglerne.</p>
+        <p className="muted">Instruktøren deler filmen op i scener og shots, finder karakterer, locations og props og tjekker kontinuiteten mod filmreglerne. Det tager typisk 1–2 minutter.</p>
+        {problem && <Notice tone="warn">{problem === 'stalled' ? 'Sidste forsøg blev ikke færdigt. Prøv igen.' : texts.errors.generationRetry}</Notice>}
         <Button kind="primary" disabled={!!busy || working} onClick={async () => {
           const r = await run('sb', () => api.generateStoryboard(d.brief!.id, key.current.get()), 'Storyboardet er klar til gennemsyn.');
           if (r.ok) key.current.reset();

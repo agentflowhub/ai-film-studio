@@ -4,9 +4,10 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { api } from './api.ts';
+import { isRunning } from './derive.ts';
 import { supabase } from './supabase.ts';
 import type {
-  AssetRow, BriefRow, DnaRow, FixLogRow, GenerationRow, PlanResponse, Project, RuleRow, ShotRow, StoryboardRow,
+  AssetRow, BriefRow, DnaRow, FixLogRow, GenerationRow, PlanResponse, Project, RuleRow, ShotRow, StoryboardRow, TaskRow,
 } from './types.ts';
 
 export interface FilmData {
@@ -19,6 +20,8 @@ export interface FilmData {
   assets: AssetRow[];
   generations: GenerationRow[];
   fixLog: FixLogRow[];
+  // Seneste opgaver (brief, storyboard …), så en fejl kan vises på siden.
+  tasks: TaskRow[];
   plan: PlanResponse | null;
   planError: string | null;
   urls: Record<string, string>;
@@ -47,7 +50,7 @@ export async function loadFilm(filmId: string): Promise<FilmData> {
     supabase.from('storyboards').select('id, task_id, version, status, total_seconds').eq('project_id', filmId).order('version', { ascending: false }),
     supabase.from('assets').select('id, code, kind, name, role, consent_status, master_version_id, asset_versions(id, version, status, attributes, note, asset_references(role, is_primary, media(storage_path)))').eq('project_id', filmId).order('code'),
     supabase.from('generations').select('id, slot, shot_id, asset_version_id, version, status, review, cost_estimate_cents, cost_actual_cents, created_at, media:output_media_id(storage_path, mime), generation_attempts(attempt, provider, model, status, error, stop_confirmed, started_at, finished_at)').eq('project_id', filmId).order('created_at', { ascending: false }).limit(300),
-    supabase.from('tasks').select('status, type').eq('project_id', filmId).eq('status', 'executing'),
+    supabase.from('tasks').select('type, status, error, updated_at').eq('project_id', filmId).order('created_at', { ascending: false }).limit(20),
   ]);
 
   const sbRows = (storyboards.data ?? []) as StoryboardRow[];
@@ -73,7 +76,8 @@ export async function loadFilm(filmId: string): Promise<FilmData> {
     ...assetRows.flatMap((a) => a.asset_versions.flatMap((v) => v.asset_references.map((r) => r.media?.storage_path ?? ''))),
   ]);
 
-  const busy = (tasks.data ?? []).length > 0 || gens.some((g) => g.status === 'queued' || g.status === 'running');
+  const taskRows = (tasks.data ?? []) as TaskRow[];
+  const busy = taskRows.some((t) => isRunning(t)) || gens.some((g) => g.status === 'queued' || g.status === 'running');
   return {
     project: project.data as Project,
     brief: one(brief) as BriefRow | null,
@@ -84,6 +88,7 @@ export async function loadFilm(filmId: string): Promise<FilmData> {
     assets: assetRows,
     generations: gens,
     fixLog,
+    tasks: taskRows,
     plan: plan && plan.ok ? plan.data : null,
     planError: plan && !plan.ok ? plan.message : null,
     urls,
@@ -143,3 +148,4 @@ export function primaryReferenceUrl(d: FilmData, asset: AssetRow): string | null
   const ref = v?.asset_references.find((r) => r.is_primary) ?? v?.asset_references[0];
   return ref?.media ? d.urls[ref.media.storage_path] ?? null : null;
 }
+

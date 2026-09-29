@@ -5,8 +5,9 @@
 export const MAX_ATTEMPTS = 3;
 // En opgave, der har stået som 'executing' længere end dette, er gået tabt
 // (fx en Edge Function, der blev stoppet midt i kaldet) og må forsøges igen.
-// Skal være længere end Claude-kaldets tidsgrænse (CLAUDE_TIMEOUT_MS).
-export const STALE_EXECUTING_MS = 5 * 60_000;
+// Skal være længere end Claude-kaldets længste tidsgrænse (MAX_TIMEOUT_MS i
+// model-config.ts) og Edge Functions' længste køretid (400 sek.).
+export const STALE_EXECUTING_MS = 8 * 60_000;
 
 export interface ExistingTask {
   status: string;

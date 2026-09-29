@@ -2,7 +2,8 @@
 // seneste aktivitet. Ren logik oven på FilmData, så den kan enhedstestes.
 
 import type { FilmData } from './data.ts';
-import type { AssetRow, PackageItem, ShotPlanView, ShotRow } from './types.ts';
+import { STALE_EXECUTING_MS } from '../../supabase/functions/_shared/task-claim.ts';
+import type { AssetRow, PackageItem, ShotPlanView, ShotRow, TaskRow } from './types.ts';
 
 export const planFor = (d: FilmData, shotId: string): ShotPlanView | undefined => d.plan?.shots.find((s) => s.shotId === shotId);
 
@@ -81,4 +82,19 @@ export function ago(iso: string, now = Date.now()): string {
   const h = Math.round(min / 60);
   if (h < 24) return `${h} t. siden`;
   return `${Math.round(h / 24)} d. siden`;
+}
+
+// En opgave, der har stået som 'executing' for længe, er gået tabt (fx en Edge
+// Function, der blev stoppet) — den tæller ikke som "i gang", og kan startes igen.
+export function isRunning(t: TaskRow, now = Date.now()): boolean {
+  return t.status === 'executing' && now - Date.parse(t.updated_at) <= STALE_EXECUTING_MS;
+}
+
+// Seneste forsøg på en opgavetype, hvis det fejlede eller gik i stå.
+export function lastProblem(tasks: TaskRow[], type: string, now = Date.now()): 'failed' | 'stalled' | null {
+  const t = tasks.find((x) => x.type === type);
+  if (!t) return null;
+  if (t.status === 'failed') return 'failed';
+  if (t.status === 'executing' && !isRunning(t, now)) return 'stalled';
+  return null;
 }

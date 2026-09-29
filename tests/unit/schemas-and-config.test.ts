@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { envKeyFor, modelFor } from '../../supabase/functions/_shared/model-config.ts';
+import { DEFAULT_TIMEOUT_MS, envKeyFor, MAX_TIMEOUT_MS, modelFor, timeoutFor } from '../../supabase/functions/_shared/model-config.ts';
+import { STALE_EXECUTING_MS } from '../../supabase/functions/_shared/task-claim.ts';
 import { briefUserMessage } from '../../supabase/functions/_shared/prompts.ts';
 import {
   BriefAnswersSchema,
@@ -73,13 +74,25 @@ describe('briefUserMessage', () => {
 
 describe('modelFor', () => {
   it('bruger standardmodellen pr. opgavetype', () => {
-    expect(modelFor('brief.generate').model).toBe('claude-opus-5');
+    expect(modelFor('brief.generate').model).toBe('claude-opus-5-5');
   });
 
   it('kan overskrives pr. opgavetype via miljøvariabel', () => {
     expect(envKeyFor('storyboard.generate')).toBe('FILM_MODEL_STORYBOARD_GENERATE');
     const env = (key: string) => (key === 'FILM_MODEL_STORYBOARD_GENERATE' ? 'claude-sonnet-5' : undefined);
     expect(modelFor('storyboard.generate', env).model).toBe('claude-sonnet-5');
-    expect(modelFor('brief.generate', env).model).toBe('claude-opus-5');
+    expect(modelFor('brief.generate', env).model).toBe('claude-opus-5-5');
+  });
+});
+
+describe('tidsgrænse for Claude-kald', () => {
+  it('ligger under Edge Functions\' køretid og kan kun hæves op til loftet', () => {
+    expect(modelFor('storyboard.generate').timeoutMs).toBe(DEFAULT_TIMEOUT_MS);
+    expect(DEFAULT_TIMEOUT_MS).toBeLessThan(150_000);
+    expect(timeoutFor((k) => (k === 'FILM_CLAUDE_TIMEOUT_MS' ? '380000' : undefined))).toBe(380_000);
+    expect(timeoutFor((k) => (k === 'FILM_CLAUDE_TIMEOUT_MS' ? '900000' : undefined))).toBe(MAX_TIMEOUT_MS);
+    expect(timeoutFor((k) => (k === 'FILM_CLAUDE_TIMEOUT_MS' ? 'nej' : undefined))).toBe(DEFAULT_TIMEOUT_MS);
+    expect(MAX_TIMEOUT_MS).toBeLessThan(400_000);
+    expect(STALE_EXECUTING_MS).toBeGreaterThan(400_000);
   });
 });

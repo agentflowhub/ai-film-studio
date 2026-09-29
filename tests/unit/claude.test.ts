@@ -34,10 +34,22 @@ describe('generateStructured', () => {
     });
     const result = await generateStructured(client, base);
     expect(result).toEqual({ data: { title: 'Testfilm' }, model: 'claude-opus-5', usage: { input_tokens: 100, output_tokens: 50 } });
-    expect(sent.model).toBe('claude-opus-5');
+    expect(sent.model).toBe('claude-opus-5-5');
     expect(sent.thinking).toEqual({ type: 'adaptive' });
     expect(sent.fallbacks).toBe('default');
     expect(sent.betas).toEqual(['server-side-fallback-2026-07-01']);
+  });
+
+  it('sender tidsgrænsen med og slår SDK\'ens egne genforsøg fra', async () => {
+    let opts: Record<string, unknown> = {};
+    const client: BetaMessagesParse = {
+      parse: ((_p: unknown, o: unknown) => {
+        opts = o as Record<string, unknown>;
+        return Promise.resolve({ model: 'm', usage: { input_tokens: 1, output_tokens: 1 }, stop_reason: 'end_turn', parsed_output: { title: 'ok' } });
+      }) as unknown as BetaMessagesParse['parse'],
+    };
+    await generateStructured(client, base);
+    expect(opts).toEqual({ timeout: base.config.timeoutMs, maxRetries: 0 });
   });
 
   it('afviser output, der bryder vores egne grænser', async () => {

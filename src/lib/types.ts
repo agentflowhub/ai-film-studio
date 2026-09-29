@@ -122,6 +122,13 @@ export interface AttemptRow {
   finished_at: string | null;
 }
 
+export interface TaskRow {
+  type: string;
+  status: string;
+  error: { code?: string; message?: string; retryable?: boolean } | null;
+  updated_at: string;
+}
+
 export interface FixLogRow {
   id: string;
   shot_id: string;

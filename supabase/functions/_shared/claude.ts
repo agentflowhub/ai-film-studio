@@ -10,7 +10,6 @@ import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import type * as z from 'zod/v4';
 import type { ModelConfig } from './model-config.ts';
 
-export const CLAUDE_TIMEOUT_MS = 180_000;
 const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
 
 export type GenerateErrorCode =
@@ -69,7 +68,9 @@ export async function generateStructured<S extends z.ZodType>(
         betas: [FALLBACK_BETA],
         fallbacks: 'default',
       },
-      { timeout: CLAUDE_TIMEOUT_MS },
+      // Ingen automatiske genforsøg i SDK'en: tre forsøg efter hinanden ville
+      // sprænge Edge Functions' køretid. Opgaven kan i stedet prøves igen.
+      { timeout: params.config.timeoutMs, maxRetries: 0 },
     );
   } catch (err) {
     throw toGenerateError(err);

@@ -36,6 +36,10 @@ Kun som Supabase secrets — aldrig i koden eller i `.env`-filer, der committes.
 npx supabase secrets set ANTHROPIC_API_KEY=... OPENAI_API_KEY=... HIGGSFIELD_CREDENTIALS=KEY_ID:KEY_SECRET WORKER_SECRET=<lang tilfældig streng> APP_ENV=production
 ```
 
+På en betalt Supabase-plan kan Claude-kald få længere tid:
+`FILM_CLAUDE_TIMEOUT_MS=380000` (standard 140000, fordi gratis-planen stopper en
+Edge Function efter 150 sek.).
+
 Valgfrit: priser pr. model i øre, fx `FILM_PRICE_HIGGSFIELD_DOP_STANDARD=800`
 (se `supabase/functions/_shared/providers/catalog.ts`).
 

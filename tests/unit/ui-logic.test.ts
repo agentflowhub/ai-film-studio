@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { changedPrice } from '../../src/lib/describeError.ts';
-import { ago, readiness, recentActivity, timecodes } from '../../src/lib/derive.ts';
+import { ago, lastProblem, readiness, recentActivity, timecodes } from '../../src/lib/derive.ts';
 import type { FilmData } from '../../src/lib/data.ts';
 import { continuityScore, kr, shotState, tc } from '../../src/lib/shotState.ts';
 import type { ShotPlanView, ShotRow } from '../../src/lib/types.ts';
@@ -71,7 +71,7 @@ describe('afledte tal', () => {
   const shot = (id: string, code: string, d: number) => ({ id, code, duration_seconds: d, shot_assets: [] }) as unknown as ShotRow;
   const film = (over: Partial<FilmData> = {}): FilmData => ({
     project: { id: 'p', org_id: 'o', title: 'T', idea: '', stage: 'production', created_at: '' },
-    brief: null, dna: null, rules: [], storyboard: null, shots: [], assets: [], generations: [], fixLog: [],
+    brief: null, dna: null, rules: [], storyboard: null, shots: [], assets: [], generations: [], fixLog: [], tasks: [],
     plan: null, planError: null, urls: {}, busy: false, ...over,
   });
 
@@ -91,5 +91,16 @@ describe('afledte tal', () => {
     const a = recentActivity(film({ shots: [shot('a', '01', 3)], generations: [g('1', '2026-01-01', 'approved'), g('2', '2026-01-02', 'pending')] }));
     expect(a[0]!.text).toContain('venter på dig');
     expect(a[1]!.text).toContain('godkendt');
+  });
+});
+
+describe('opgaver, der går i stå', () => {
+  const now = Date.parse('2026-09-29T12:00:00Z');
+  const task = (status: string, minAgo: number) => ({ type: 'storyboard.generate', status, error: null, updated_at: new Date(now - minAgo * 60000).toISOString() });
+  it('en frisk opgave kører; en gammel er gået i stå; en fejlet vises', () => {
+    expect(lastProblem([task('executing', 1)], 'storyboard.generate', now)).toBeNull();
+    expect(lastProblem([task('executing', 30)], 'storyboard.generate', now)).toBe('stalled');
+    expect(lastProblem([task('failed', 1)], 'storyboard.generate', now)).toBe('failed');
+    expect(lastProblem([task('done', 1)], 'storyboard.generate', now)).toBeNull();
   });
 });
