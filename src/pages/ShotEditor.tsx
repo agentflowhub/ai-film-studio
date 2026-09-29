@@ -323,7 +323,7 @@ export function GenCard({ d, g, approved, busy, onReview, label }: { d: FilmData
           <strong>{label ? `${label} · ` : ''}v{g.version}</strong>
           <StatusPill status={state} label={approved ? 'I brug' : undefined} />
         </div>
-        <span className="muted small">{last ? `${last.model}${g.generation_attempts.length > 1 ? ` · ${g.generation_attempts.length} forsøg` : ''}` : ''} · {kr(g.cost_actual_cents ?? g.cost_estimate_cents)}</span>
+        <span className="muted small">{last ? `${last.model}${g.generation_attempts.length > 1 ? ` · ${g.generation_attempts.length} forsøg` : ''}` : ''} {state === 'failed' ? ' · intet betalt' : ` · ${kr(g.cost_actual_cents ?? g.cost_estimate_cents)}`}</span>
         {state === 'failed' && last?.error?.reason && <span className="small fail">{last.error.reason}</span>}
         {state === 'needs_approval' && (
           <div className="row">

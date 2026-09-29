@@ -43,8 +43,9 @@ describe('OpenAI (ChatGPT Images)', () => {
   });
 
   it('en afvisning (400) er bekræftet uden job; 5xx er ukendt', async () => {
-    const bad = createOpenAiImages('k', settings.openai, OPENAI_MODELS, mockFetch(() => ({ status: 400 })).fn);
+    const bad = createOpenAiImages('k', settings.openai, OPENAI_MODELS, mockFetch(() => ({ status: 401, json: { error: { message: 'Incorrect API key provided' } } })).fn);
     await expect(bad.submit('gpt-image-2.5-flare', req, 'x')).rejects.toBeInstanceOf(ProviderRejectedError);
+    await expect(bad.submit('gpt-image-2.5-flare', req, 'x')).rejects.toThrow('OpenAI afviste kaldet (401): Incorrect API key provided');
     const down = createOpenAiImages('k', settings.openai, OPENAI_MODELS, mockFetch(() => ({ status: 503 })).fn);
     await expect(down.submit('gpt-image-2.5-flare', req, 'x')).rejects.not.toBeInstanceOf(ProviderRejectedError);
   });

@@ -64,7 +64,7 @@ export function createOpenAiImages(apiKey: string, settings: ProviderSettings['o
       });
       if (!res.ok) {
         if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 409 && res.status !== 429) {
-          throw new ProviderRejectedError(`OpenAI afviste kaldet (${res.status})`, res.status);
+          throw new ProviderRejectedError(`OpenAI afviste kaldet (${res.status})${await reasonOf(res)}`, res.status);
         }
         throw new Error(`OpenAI svarede ${res.status}`);
       }
@@ -98,4 +98,15 @@ export function createOpenAiImages(apiKey: string, settings: ProviderSettings['o
       return !!r && r.status !== 'queued' && r.status !== 'in_progress';
     },
   };
+}
+
+// Providerens egen forklaring på en afvisning (fx ugyldig nøgle), kort.
+async function reasonOf(res: Response): Promise<string> {
+  try {
+    const body = (await res.json()) as { error?: { message?: string } | string; detail?: unknown; message?: string };
+    const msg = typeof body.error === 'string' ? body.error : body.error?.message ?? body.message ?? (typeof body.detail === 'string' ? body.detail : '');
+    return msg ? `: ${String(msg).slice(0, 200)}` : '';
+  } catch {
+    return '';
+  }
 }
