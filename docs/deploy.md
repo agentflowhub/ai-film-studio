@@ -48,13 +48,15 @@ npx supabase functions deploy
 ## 5. Worker hvert minut
 
 Køres én gang i SQL Editor. `WORKER_SECRET` lægges i Vault, så den ikke står
-i klartekst i cron-jobbet.
+i klartekst i cron-jobbet. Fejler `create extension`, så slå pg_cron og
+pg_net til under Database → Extensions, og kør resten.
 
 ```sql
-create extension if not exists pg_cron;
-create extension if not exists pg_net;
+create extension if not exists pg_cron with schema pg_catalog;
+create extension if not exists pg_net with schema extensions;
 
-select vault.create_secret('<samme WORKER_SECRET som i trin 3>', 'frame_worker_secret');
+select vault.create_secret('<samme WORKER_SECRET som i trin 3>', 'frame_worker_secret')
+where not exists (select 1 from vault.secrets where name = 'frame_worker_secret');
 
 select cron.schedule('frame-generation-worker', '* * * * *', $$
   select net.http_post(
