@@ -53,8 +53,10 @@ export function concatList(files: string[]): string {
 
 // Filnavn ud fra filmens titel: kun tegn, alle systemer accepterer.
 export function fileName(title: string): string {
-  const base = title.normalize('NFKD').replace(/[̀-ͯ]/g, '')
+  // Danske bogstaver først; NFKD ville ellers gøre å til a.
+  const base = title.normalize('NFC')
     .replace(/[æÆ]/g, (c) => (c === 'æ' ? 'ae' : 'Ae')).replace(/[øØ]/g, (c) => (c === 'ø' ? 'oe' : 'Oe')).replace(/[åÅ]/g, (c) => (c === 'å' ? 'aa' : 'Aa'))
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^A-Za-z0-9 _-]+/g, '').trim().replace(/\s+/g, '-');
   return `${base || 'film'}.mp4`;
 }
