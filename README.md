@@ -93,7 +93,7 @@ er endnu kørt mod et rigtigt Supabase-projekt eller rigtige API-nøgler.
 | Provider | Bruges til | Hemmelighed | Modeller |
 |---|---|---|---|
 | OpenAI — ChatGPT Images | Referencebilleder og startframes | `OPENAI_API_KEY` | `gpt-image-2.5-sunburst` (præcis), `gpt-image-2.5-flare` (hurtig, reserve) |
-| Higgsfield | Video fra den godkendte startframe | `HIGGSFIELD_CREDENTIALS` (API-nøglen) | DoP `dop-standard`, `dop-turbo` (reserve) |
+| Higgsfield | Video fra den godkendte startframe | `HIGGSFIELD_CREDENTIALS` (API-nøglen) | DoP `dop-preview`, `dop-turbo` (reserve) |
 | ElevenLabs | Dansk tale: replikker med karakterens faste stemme | `ELEVENLABS_API_KEY` | `eleven_v3`, `eleven_multilingual_v2` (reserve) |
 | Higgsfield Speak | Talende video: munden følger den godkendte replik | `HIGGSFIELD_CREDENTIALS` | `speak` (5, 10 eller 15 sek.) |
 

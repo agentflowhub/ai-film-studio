@@ -40,7 +40,7 @@ På en betalt Supabase-plan kan Claude-kald få længere tid:
 `FILM_CLAUDE_TIMEOUT_MS=380000` (standard 140000, fordi gratis-planen stopper en
 Edge Function efter 150 sek.).
 
-Valgfrit: priser pr. model i øre, fx `FILM_PRICE_HIGGSFIELD_DOP_STANDARD=800`
+Valgfrit: priser pr. model i øre, fx `FILM_PRICE_HIGGSFIELD_DOP_PREVIEW=800`
 (se `supabase/functions/_shared/providers/catalog.ts`).
 
 ## 4. Edge Functions

@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { planProject, type PlanInput } from '../../supabase/functions/_shared/plan.ts';
 import { ELEVENLABS_MODELS, HIGGSFIELD_SPEAK_MODELS, providerSettings } from '../../supabase/functions/_shared/providers/catalog.ts';
-import { createElevenLabs } from '../../supabase/functions/_shared/providers/elevenlabs.ts';
+import { createElevenLabs, listVoices } from '../../supabase/functions/_shared/providers/elevenlabs.ts';
 import { createHiggsfield, speakDuration } from '../../supabase/functions/_shared/providers/higgsfield.ts';
 import { createRegistry } from '../../supabase/functions/_shared/providers/registry.ts';
 import { silentWav, SIMULATOR_MODELS } from '../../supabase/functions/_shared/providers/simulator.ts';
@@ -112,6 +112,33 @@ describe('ElevenLabs', () => {
     await expect(a.run!('eleven_v3', { prompt: 'Hej', referenceUrls: [], aspectRatio: '16:9' }, 'k')).rejects.toBeInstanceOf(ProviderRejectedError);
     expect(m.calls).toHaveLength(0);
     await expect(a.run!('eleven_v3', { prompt: 'Hej', voiceId: 'v1234', referenceUrls: [], aspectRatio: '16:9' }, 'k')).rejects.toBeInstanceOf(ProviderRejectedError);
+  });
+
+  it('forklarer på dansk, når stemmen kræver en betalt plan', async () => {
+    const m = mockFetch(() => new Response(JSON.stringify({ detail: { status: 'x', message: 'Instantly cloned voices are not available on your current plan. Please upgrade your subscription.' } }), { status: 401 }));
+    await expect(createElevenLabs('xi', settings, ELEVENLABS_MODELS, m.fn).run!('eleven_v3', { prompt: 'Hej', voiceId: 'v1234', referenceUrls: [], aspectRatio: '16:9' }, 'k'))
+      .rejects.toThrow(/Vælg en af standardstemmerne/);
+  });
+
+  const voicesBody = { voices: [
+    { voice_id: 'pre1', name: 'Rachel', category: 'premade', preview_url: 'https://p/1.mp3', labels: { gender: 'female' } },
+    { voice_id: 'clo1', name: 'Min klon', category: 'cloned' },
+    { voice_id: 'lib1', name: 'Dansk fortæller', category: 'professional' },
+  ] };
+
+  it('på gratisplanen vises kun standardstemmer', async () => {
+    const m = mockFetch((url) => new Response(JSON.stringify(url.endsWith('/subscription') ? { tier: 'free' } : voicesBody), { status: 200 }));
+    const r = await listVoices('xi', m.fn);
+    expect(r.freePlan).toBe(true);
+    expect(r.voices.map((v) => v.voice_id)).toEqual(['pre1']);
+  });
+
+  it('på en betalt plan, eller hvis planen ikke kan aflæses, vises alle', async () => {
+    const paid = mockFetch((url) => new Response(JSON.stringify(url.endsWith('/subscription') ? { tier: 'creator' } : voicesBody), { status: 200 }));
+    expect((await listVoices('xi', paid.fn)).voices).toHaveLength(3);
+    const unknown = mockFetch((url) => (url.endsWith('/subscription') ? new Response('{}', { status: 401 }) : new Response(JSON.stringify(voicesBody), { status: 200 })));
+    const r = await listVoices('xi', unknown.fn);
+    expect([r.freePlan, r.voices.length]).toEqual([false, 3]);
   });
 });
 

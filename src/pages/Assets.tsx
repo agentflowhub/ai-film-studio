@@ -263,12 +263,14 @@ function VoicePicker({ d, a }: { d: FilmData; a: AssetRow }) {
   const [voices, setVoices] = useState<VoiceOption[] | null>(null);
   const [state, setState] = useState<'idle' | 'loading' | 'missing' | 'error'>('idle');
   const [chosen, setChosen] = useState(a.voice_id ?? '');
+  const [freePlan, setFreePlan] = useState(false);
   async function load() {
     setState('loading');
     const r = await api.voices(d.project.id);
     if (!r.ok) return setState('error');
     if (!r.data.configured) return setState('missing');
     setVoices(r.data.voices);
+    setFreePlan(r.data.free_plan);
     setState('idle');
   }
   const current = voices?.find((v) => v.voice_id === chosen);
@@ -288,6 +290,8 @@ function VoicePicker({ d, a }: { d: FilmData; a: AssetRow }) {
         <Button onClick={load} disabled={state === 'loading'}>{state === 'loading' ? 'Henter stemmer …' : a.voice_id ? 'Skift stemme' : 'Vælg stemme'}</Button>
       ) : (
         <div className="stack">
+          {freePlan && <p className="muted small">ElevenLabs-kontoen er på gratisplanen, så kun standardstemmerne vises. Klonede stemmer og stemmer fra Voice Library kræver et betalt abonnement.</p>}
+          {freePlan && a.voice_id && !voices.some((v) => v.voice_id === a.voice_id) && <Notice tone="warn">Den nuværende stemme kan ikke bruges på gratisplanen. Vælg en ny.</Notice>}
           <div className="row">
             <select value={chosen} onChange={(e) => setChosen(e.target.value)} aria-label="Stemme">
               <option value="">— Vælg —</option>

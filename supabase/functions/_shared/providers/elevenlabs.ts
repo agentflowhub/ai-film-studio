@@ -39,7 +39,7 @@ export function createElevenLabs(apiKey: string, settings: ProviderSettings['ele
       if (!res.ok) {
         const reason = await reasonOf(res);
         if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 409 && res.status !== 429) {
-          throw new ProviderRejectedError(`ElevenLabs afviste kaldet (${res.status})${reason}`, res.status);
+          throw new ProviderRejectedError(`ElevenLabs afviste kaldet (${res.status})${reason}${planHint(reason)}`, res.status);
         }
         throw new Error(`ElevenLabs svarede ${res.status}${reason}`);
       }
@@ -61,16 +61,42 @@ export function createElevenLabs(apiKey: string, settings: ProviderSettings['ele
   };
 }
 
-export async function listVoices(apiKey: string, fetchFn: typeof fetch = fetch): Promise<Voice[]> {
+// Kun stemmer, kontoen faktisk må bruge via API'et. På gratisplanen afviser
+// ElevenLabs klonede stemmer og stemmer fra Voice Library (401), så dér vises
+// kun ElevenLabs' egne standardstemmer. Kan planen ikke aflæses, vises alle.
+export async function listVoices(apiKey: string, fetchFn: typeof fetch = fetch): Promise<{ voices: Voice[]; freePlan: boolean }> {
   const res = await fetchFn(`${BASE}/v1/voices`, { headers: { 'xi-api-key': apiKey } });
   if (!res.ok) throw new Error(`ElevenLabs svarede ${res.status}${await reasonOf(res)}`);
-  const body = (await res.json()) as { voices?: { voice_id: string; name: string; preview_url?: string | null; labels?: Record<string, string>; description?: string | null }[] };
-  return (body.voices ?? []).map((v) => ({
-    voice_id: v.voice_id,
-    name: v.name,
-    preview_url: v.preview_url ?? null,
-    description: [v.labels?.gender, v.labels?.age, v.labels?.accent, v.labels?.description ?? v.description].filter(Boolean).join(' · '),
-  }));
+  const body = (await res.json()) as { voices?: { voice_id: string; name: string; category?: string; preview_url?: string | null; labels?: Record<string, string>; description?: string | null }[] };
+  const freePlan = (await tierOf(apiKey, fetchFn)) === 'free';
+  const voices = (body.voices ?? [])
+    .filter((v) => !freePlan || v.category === 'premade')
+    .map((v) => ({
+      voice_id: v.voice_id,
+      name: v.name,
+      preview_url: v.preview_url ?? null,
+      description: [v.labels?.gender, v.labels?.age, v.labels?.accent, v.labels?.description ?? v.description].filter(Boolean).join(' · '),
+    }));
+  return { voices, freePlan };
+}
+
+async function tierOf(apiKey: string, fetchFn: typeof fetch): Promise<string | null> {
+  try {
+    const res = await fetchFn(`${BASE}/v1/user/subscription`, { headers: { 'xi-api-key': apiKey } });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { tier?: string };
+    return typeof body.tier === 'string' ? body.tier : null;
+  } catch {
+    return null;
+  }
+}
+
+// ElevenLabs' afvisning af en stemme, planen ikke dækker, oversat til noget,
+// brugeren kan handle på.
+export function planHint(reason: string): string {
+  return /cloned voices|library voices|upgrade your subscription/i.test(reason)
+    ? ' — stemmen kræver et betalt ElevenLabs-abonnement. Vælg en af standardstemmerne under Assets, eller opgradér hos ElevenLabs.'
+    : '';
 }
 
 async function reasonOf(res: Response): Promise<string> {

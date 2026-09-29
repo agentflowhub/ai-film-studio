@@ -14,9 +14,10 @@ serve('voices-list', VoicesListRequestSchema, async ({ admin, userId, body, env 
   if (!project || !(await isOrgMember(admin, project.org_id, userId))) return apiError('not_found', 404);
 
   const key = env('ELEVENLABS_API_KEY')?.trim();
-  if (!key) return json({ configured: false, voices: [] });
+  if (!key) return json({ configured: false, free_plan: false, voices: [] });
   try {
-    return json({ configured: true, voices: await listVoices(key) });
+    const { voices, freePlan } = await listVoices(key);
+    return json({ configured: true, free_plan: freePlan, voices });
   } catch (err) {
     log('error', 'voices.list_failed', { message: errorText(err) });
     return apiError('generation_failed', 502, { reason: 'upstream', retryable: true });

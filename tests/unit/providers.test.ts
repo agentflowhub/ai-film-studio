@@ -76,24 +76,24 @@ describe('Higgsfield (v1-protokol: params og job-sets)', () => {
   it('sender startframen til DoP pakket i params, med Key-godkendelse', async () => {
     const m = mockFetch(() => ({ json: jobSet('queued') }));
     const a = createHiggsfield('id:secret', settings.higgsfield, HIGGSFIELD_MODELS, m.fn);
-    expect(await a.submit('dop-standard', video, 'g:1')).toEqual({ providerJobId: 'js_1' });
+    expect(await a.submit('dop-preview', video, 'g:1')).toEqual({ providerJobId: 'js_1' });
     expect(m.calls[0]!.url).toBe('https://api.higgsfield.ai/v1/image2video/dop');
     expect(m.calls[0]!.headers.Authorization).toBe('Key id:secret');
     expect(m.calls[0]!.headers['hf-api-key']).toBe('id');
     expect(m.calls[0]!.headers['hf-secret']).toBe('secret');
-    expect(m.calls[0]!.body).toMatchObject({ params: { model: 'dop-standard', input_images: [{ type: 'image_url', image_url: 'https://s/frame.png' }] } });
+    expect(m.calls[0]!.body).toMatchObject({ params: { model: 'dop-preview', input_images: [{ type: 'image_url', image_url: 'https://s/frame.png' }] } });
   });
 
   it('en ny enkelt-nøgle sendes som "Key <nøgle>"', async () => {
     const m = mockFetch(() => ({ json: jobSet('queued') }));
-    await createHiggsfield('9a76abcdef157c', settings.higgsfield, HIGGSFIELD_MODELS, m.fn).submit('dop-standard', { ...video }, 'g:1');
+    await createHiggsfield('9a76abcdef157c', settings.higgsfield, HIGGSFIELD_MODELS, m.fn).submit('dop-preview', { ...video }, 'g:1');
     expect(m.calls[0]!.headers.Authorization).toBe('Key 9a76abcdef157c');
     expect(m.calls[0]!.headers['hf-secret']).toBeUndefined();
   });
 
   it('viser Higgsfields valideringsfejl (422) i klartekst', async () => {
     const m = mockFetch(() => ({ status: 422, json: { detail: [{ loc: ['body', 'params', 'prompt'], msg: 'String should have at most 1000 characters' }] } }));
-    await expect(createHiggsfield('k:s', settings.higgsfield, HIGGSFIELD_MODELS, m.fn).submit('dop-standard', video, 'x'))
+    await expect(createHiggsfield('k:s', settings.higgsfield, HIGGSFIELD_MODELS, m.fn).submit('dop-preview', video, 'x'))
       .rejects.toThrow('Higgsfield afviste kaldet (422): params.prompt: String should have at most 1000 characters');
   });
 
@@ -146,7 +146,7 @@ describe('registry og priser', () => {
     expect(frame.pick).toMatchObject({ provider: 'openai', model: 'gpt-image-2.5-sunburst' });
     expect(frame.fallback).toMatchObject({ provider: 'openai', model: 'gpt-image-2.5-flare' });
     const clip = recommend(models, { slot: 'video', referenceImages: 1, durationSeconds: 5, movement: 'optical_zoom', hasCharacters: true }, { allowSimulated: false });
-    expect(clip.pick).toMatchObject({ provider: 'higgsfield', model: 'dop-standard' });
+    expect(clip.pick).toMatchObject({ provider: 'higgsfield', model: 'dop-preview' });
     expect(clip.fallback).toMatchObject({ provider: 'higgsfield', model: 'dop-turbo' });
   });
 });

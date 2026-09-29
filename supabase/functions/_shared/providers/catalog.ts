@@ -23,11 +23,12 @@ export const OPENAI_MODELS: ModelInfo[] = [
 ];
 
 // Higgsfield DoP: image-to-video fra én startframe. Kamerabevægelsen beskrives
-// i prompten. Klippets længde bestemmes af modellen; sæt min/max her, når de
+// i prompten. API'et kender kun 'dop-lite', 'dop-preview' og 'dop-turbo';
+// 'dop-preview' er standardkvaliteten. Klippets længde bestemmes af modellen; sæt min/max her, når de
 // er bekræftet, så routeren kan fravælge shots, der ikke passer.
 export const HIGGSFIELD_MODELS: ModelInfo[] = [
   {
-    provider: 'higgsfield', model: 'dop-standard', label: 'Higgsfield DoP (standard)',
+    provider: 'higgsfield', model: 'dop-preview', label: 'Higgsfield DoP (standard)',
     capabilities: ['image_to_video'], maxReferenceImages: 1, movements: ALL_MOVEMENTS, priceCents: 600, quality: 3,
   },
   {
