@@ -105,7 +105,7 @@ export function toGenerateError(err: unknown): GenerateError {
     return new GenerateError('rate_limited', 'rate limit hos Claude', true);
   }
   if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
-    return new GenerateError('auth', 'Claude-nøglen blev afvist', false);
+    return new GenerateError('auth', `Claude-nøglen blev afvist (${err.status}): ${apiReason(err)}`, false);
   }
   if (err instanceof Anthropic.APIConnectionError) {
     return new GenerateError('upstream', 'ingen forbindelse til Claude', true);
@@ -114,7 +114,15 @@ export function toGenerateError(err: unknown): GenerateError {
     const status = err.status ?? 0;
     if (status === 529) return new GenerateError('overloaded', 'Claude er overbelastet', true);
     if (status >= 500) return new GenerateError('upstream', `Claude svarede ${status}`, true);
-    return new GenerateError('upstream', `Claude afviste kaldet (${status})`, false);
+    return new GenerateError('upstream', `Claude afviste kaldet (${status}): ${apiReason(err)}`, false);
   }
   return new GenerateError('upstream', 'ukendt fejl ved kald til Claude', true);
+}
+
+// Anthropics egen forklaring (fx for lav kreditsaldo eller ukendt model), så
+// en afvisning kan fejlsøges uden at gætte. Indeholder aldrig brugerens input.
+function apiReason(err: InstanceType<typeof Anthropic.APIError>): string {
+  const body = err.error as { error?: { type?: string; message?: string } } | undefined;
+  const text = body?.error?.message ?? err.message;
+  return `${body?.error?.type ?? 'fejl'}: ${String(text).slice(0, 300)}`;
 }

@@ -194,7 +194,7 @@ serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, us
         ? { code: err.code, message: err.message, retryable: err.retryable }
         : { code: 'internal', message: err instanceof Error ? err.message : String(err), retryable: true };
     await markTaskFailed(admin, task.id, failure);
-    log('error', 'storyboard.generate.failed', { task_id: task.id, code: failure.code });
+    log('error', 'storyboard.generate.failed', { task_id: task.id, code: failure.code, reason: failure.message });
     return apiError('generation_failed', 502, { task_id: task.id, reason: failure.code, retryable: failure.retryable });
   }
 });
