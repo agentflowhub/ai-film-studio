@@ -13,7 +13,8 @@ import { IdempotencyKey } from '../lib/idempotency.ts';
 import { go, href } from '../lib/router.ts';
 import { kr } from '../lib/shotState.ts';
 import type { PackageItem, ProductionItem } from '../lib/types.ts';
-import { AttemptTable, GenCard } from './ShotEditor.tsx';
+import { GenCard } from '../components/GenCards.tsx';
+import { AttemptTable } from './ShotEditor.tsx';
 
 type Tab = 'control' | 'queue';
 

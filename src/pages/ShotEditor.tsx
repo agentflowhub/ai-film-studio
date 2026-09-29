@@ -4,7 +4,8 @@
 
 import { useState, type FormEvent } from 'react';
 import { FilmHeader } from '../components/Shell.tsx';
-import { Button, Empty, Faces, Notice, StatusPill, Thumb } from '../components/ui.tsx';
+import { GenList } from '../components/GenCards.tsx';
+import { Button, Empty, Faces, Notice, StatusPill } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { primaryReferenceUrl, useFilm, type FilmData } from '../lib/data.ts';
 import { allPackages, assetsFor, planFor, timecodes } from '../lib/derive.ts';
@@ -299,40 +300,13 @@ function Results({ d, shot, p, choice }: { d: FilmData; shot: ShotRow; p?: ShotP
             ) : status !== 'generating' && gates.some((g) => !g.ok) ? (
               <ul className="checks">{gates.filter((g) => !g.ok).map((g) => <li key={g.text} className="no">{g.text}</li>)}</ul>
             ) : null}
-            <div className="results">
-              {gens.map((g) => <GenCard key={g.id} d={d} g={g} approved={g.id === approvedId} busy={!!review.busy}
-                onReview={(dec) => review.run(g.id, () => api.review(g.id, dec), dec === 'approved' ? `${slot === 'video' ? 'Videoen' : 'Startframen'} er godkendt.` : 'Resultatet er afvist.')} />)}
-              {gens.length === 0 && <p className="muted small">Intet genereret endnu.</p>}
-            </div>
+            <GenList d={d} gens={gens} approvedId={approvedId} busy={!!review.busy || !!busy}
+              onReview={(g, dec) => review.run(g.id, () => api.review(g.id, dec), dec === 'approved' ? `${slot === 'video' ? 'Videoen' : 'Startframen'} er godkendt.` : 'Resultatet er afvist.')}
+              onRetry={pkg ? () => start(id, { slot, shot_id: shot.id, choice: choice[slot] }, pkg.costCents) : undefined} />
           </div>
         );
       })}
     </div>
-  );
-}
-
-export function GenCard({ d, g, approved, busy, onReview, label }: { d: FilmData; g: GenerationRow; approved: boolean; busy: boolean; onReview: (d: 'approved' | 'rejected') => void; label?: string }) {
-  const url = g.media ? d.urls[g.media.storage_path] : null;
-  const last = [...g.generation_attempts].sort((a, b) => b.attempt - a.attempt)[0];
-  const state = g.status === 'queued' || g.status === 'running' ? 'generating' : g.status === 'failed' ? 'failed' : g.review === 'approved' ? 'approved' : g.review === 'rejected' ? 'rejected' : g.status === 'succeeded' ? 'needs_approval' : 'draft';
-  return (
-    <figure className={`gencard ${approved ? 'chosen' : ''}`}>
-      <Thumb url={url} mime={g.media?.mime} alt={`Version ${g.version}`} empty={state === 'generating' ? 'Genererer …' : state === 'failed' ? 'Fejlede' : '—'} />
-      <figcaption>
-        <div className="row between">
-          <strong>{label ? `${label} · ` : ''}v{g.version}</strong>
-          <StatusPill status={state} label={approved ? 'I brug' : undefined} />
-        </div>
-        <span className="muted small">{last ? `${last.model}${g.generation_attempts.length > 1 ? ` · ${g.generation_attempts.length} forsøg` : ''}` : ''} {state === 'failed' ? ' · intet betalt' : ` · ${kr(g.cost_actual_cents ?? g.cost_estimate_cents)}`}</span>
-        {state === 'failed' && last?.error?.reason && <span className="small fail">{last.error.reason}</span>}
-        {state === 'needs_approval' && (
-          <div className="row">
-            <Button small kind="approve" disabled={busy} onClick={() => onReview('approved')}>{texts.common.approve}</Button>
-            <Button small kind="reject" disabled={busy} onClick={() => onReview('rejected')}>{texts.common.reject}</Button>
-          </div>
-        )}
-      </figcaption>
-    </figure>
   );
 }
 

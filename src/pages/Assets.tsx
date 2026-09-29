@@ -12,7 +12,7 @@ import { kr } from '../lib/shotState.ts';
 import { texts } from '../lib/texts.ts';
 import type { AssetRow, AssetVersionRow } from '../lib/types.ts';
 import { useStartOne } from '../lib/useStartOne.ts';
-import { GenCard } from './ShotEditor.tsx';
+import { GenList, ZoomThumb } from '../components/GenCards.tsx';
 
 type Kind = AssetRow['kind'];
 const WORLD_TABS: [Kind, string][] = [['location', 'Locations'], ['vehicle', 'Køretøjer'], ['prop', 'Props']];
@@ -127,9 +127,9 @@ function AssetDetail({ d, a, section }: { d: FilmData; a: AssetRow; section: 'ch
       <a className="muted small" href={href({ name: section, filmId: d.project.id })}>← {section === 'characters' ? 'Alle karakterer' : 'Alle locations og aktiver'}</a>
       <div className="detail">
         <div className="detail-media">
-          <Thumb url={primary?.url} alt={a.name} ratio={a.kind === 'character' ? '3 / 4' : '16 / 9'} empty="Ingen referencebilleder endnu" />
+          <ZoomThumb url={primary?.url} alt={a.name} ratio={a.kind === 'character' ? '3 / 4' : '16 / 9'} empty="Ingen referencebilleder endnu" />
           <div className="refgrid">
-            {refs.map((r) => <Thumb key={r.role} url={r.url} alt={r.role} ratio="1 / 1" />)}
+            {refs.map((r) => <ZoomThumb key={r.role} url={r.url} alt={`${a.name} · ${r.role}`} ratio="1 / 1" />)}
           </div>
         </div>
         <div className="detail-main stack">
@@ -174,10 +174,9 @@ function AssetDetail({ d, a, section }: { d: FilmData; a: AssetRow; section: 'ch
               }}>Rediger i ny version</Button>
             </div>
             {refGens.length > 0 && (
-              <div className="results">
-                {refGens.map((g) => <GenCard key={g.id} d={d} g={g} approved={false} busy={!!busy}
-                  onReview={(dec) => run(g.id, () => api.review(g.id, dec), dec === 'approved' ? `Referencen er godkendt. ${a.name} v${v.version} er låst.` : 'Referencen er afvist.')} />)}
-              </div>
+              <GenList d={d} gens={refGens} busy={!!busy || !!gen.busy}
+                onReview={(g, dec) => run(g.id, () => api.review(g.id, dec), dec === 'approved' ? `Referencen er godkendt. ${a.name} v${v.version} er låst.` : 'Referencen er afvist.')}
+                onRetry={pkg ? () => gen.start(`ref:${v.id}`, { slot: 'reference', asset_version_id: v.id }, pkg.costCents) : undefined} />
             )}
           </div>
         </div>
@@ -229,7 +228,7 @@ function References({ d, v, editable }: { d: FilmData; v: AssetVersionRow; edita
       <div className="refgrid large">
         {v.asset_references.map((r) => (
           <figure key={r.role}>
-            <Thumb url={r.media ? d.urls[r.media.storage_path] : null} alt={r.role} ratio="1 / 1" />
+            <ZoomThumb url={r.media ? d.urls[r.media.storage_path] : null} alt={r.role} ratio="1 / 1" />
             <figcaption className="small">{ROLES.find(([k]) => k === r.role)?.[1] ?? r.role}{r.is_primary ? ' · primær' : ''}</figcaption>
           </figure>
         ))}
