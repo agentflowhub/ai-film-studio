@@ -17,6 +17,9 @@ export interface FilmData {
   rules: RuleRow[];
   storyboard: StoryboardRow | null;
   shots: ShotRow[];
+  // Et nyt storyboard til en film i produktion, der venter på godkendelse.
+  // Produktionen bruger `storyboard`, til det nye er godkendt.
+  draft: { storyboard: StoryboardRow; shots: ShotRow[] } | null;
   assets: AssetRow[];
   generations: GenerationRow[];
   fixLog: FixLogRow[];
@@ -57,13 +60,16 @@ export async function loadFilm(filmId: string): Promise<FilmData> {
   const storyboard = sbRows.find((s) => s.status === 'approved') ?? sbRows[0] ?? null;
   let shots: ShotRow[] = [];
   let fixLog: FixLogRow[] = [];
+  const shotsOf = async (id: string) => {
+    const s = await supabase.from('shots').select('id, code, scene_number, shot_number, duration_seconds, shot_type, lens_mm, movement, camera, action, dialogue, notes, performance, lighting, audio, spec_version, approved_start_frame_id, approved_video_id, speaker_asset_id, approved_dialogue_id, dialogue_mode, shot_assets(asset_id, asset_version_id, pinned)').eq('storyboard_id', id).order('code');
+    return (s.data ?? []) as unknown as ShotRow[];
+  };
+  const newest = sbRows[0];
+  const draft = storyboard && newest && newest.version > storyboard.version && newest.status === 'pending_approval'
+    ? { storyboard: newest, shots: await shotsOf(newest.id) }
+    : null;
   if (storyboard) {
-    const s = await supabase
-      .from('shots')
-      .select('id, code, scene_number, shot_number, duration_seconds, shot_type, lens_mm, movement, camera, action, dialogue, notes, performance, lighting, audio, spec_version, approved_start_frame_id, approved_video_id, speaker_asset_id, approved_dialogue_id, dialogue_mode, shot_assets(asset_id, asset_version_id, pinned)')
-      .eq('storyboard_id', storyboard.id)
-      .order('code');
-    shots = (s.data ?? []) as unknown as ShotRow[];
+    shots = await shotsOf(storyboard.id);
     const f = await supabase.from('shot_fix_log').select('id, shot_id, text, before, undone_at, created_at').in('shot_id', shots.map((x) => x.id)).order('created_at', { ascending: false }).limit(100);
     fixLog = (f.data ?? []) as FixLogRow[];
   }
@@ -85,6 +91,7 @@ export async function loadFilm(filmId: string): Promise<FilmData> {
     rules: (rules.data ?? []) as RuleRow[],
     storyboard,
     shots,
+    draft,
     assets: assetRows,
     generations: gens,
     fixLog,

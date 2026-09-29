@@ -72,7 +72,7 @@ describe('afledte tal', () => {
   const shot = (id: string, code: string, d: number) => ({ id, code, duration_seconds: d, shot_assets: [] }) as unknown as ShotRow;
   const film = (over: Partial<FilmData> = {}): FilmData => ({
     project: { id: 'p', org_id: 'o', title: 'T', idea: '', stage: 'production', created_at: '' },
-    brief: null, dna: null, rules: [], storyboard: null, shots: [], assets: [], generations: [], fixLog: [], tasks: [],
+    brief: null, dna: null, rules: [], storyboard: null, shots: [], draft: null, assets: [], generations: [], fixLog: [], tasks: [],
     plan: null, planError: null, urls: {}, busy: false, ...over,
   });
 

@@ -30,8 +30,8 @@ export const api = {
     call<{ task_id: string; brief_id: string }>('brief-generate', { project_id: projectId, idempotency_key: key, answers }),
   decide: (taskId: string, decision: 'approved' | 'rejected', comment?: string) =>
     call<{ task_id: string }>('approval-decide', { task_id: taskId, decision, ...(comment ? { comment } : {}) }),
-  generateStoryboard: (briefId: string, key: string) =>
-    call<{ task_id: string; storyboard_id: string }>('storyboard-generate', { brief_id: briefId, idempotency_key: key }),
+  generateStoryboard: (briefId: string, key: string, restart = false) =>
+    call<{ task_id: string; storyboard_id: string }>('storyboard-generate', { brief_id: briefId, idempotency_key: key, ...(restart ? { restart: true } : {}) }),
   rules: (projectId: string, change: { add?: { text: string; trigger_words: string[] }[]; toggle?: { id: string; enabled: boolean }[] }) =>
     call<{ rules: unknown[] }>('film-rules-update', { project_id: projectId, ...change }),
   asset: (body: Record<string, unknown>) => call<Record<string, string>>('asset-save', body),

@@ -6,7 +6,7 @@ import { FilmHeader } from '../components/Shell.tsx';
 import { Button, Empty, Faces, Notice, Progress, StatusPill, Thumb } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { outputFor, primaryReferenceUrl, useFilm, type FilmData } from '../lib/data.ts';
-import { ago, allPackages, lastProblem, assetsFor, packageTotal, planFor, readiness, recentActivity, spentCents, timecodes } from '../lib/derive.ts';
+import { ago, allPackages, isRunning, lastProblem, assetsFor, packageTotal, planFor, readiness, recentActivity, spentCents, timecodes } from '../lib/derive.ts';
 import { useRun } from '../lib/flash.ts';
 import { IdempotencyKey } from '../lib/idempotency.ts';
 import { go, href } from '../lib/router.ts';
@@ -26,6 +26,7 @@ export function Storyboard({ filmId }: { filmId: string }) {
     <>
       <FilmHeader route={route} />
       <StoryboardGate d={data} />
+      <NewStoryboard d={data} />
       {data.shots.length > 0 && (
         <div className="board">
           <div className="board-main">
@@ -93,6 +94,97 @@ function StoryboardGate({ d }: { d: FilmData }) {
     );
   }
   return null;
+}
+
+// Et nyt storyboard til en film, der allerede er i produktion. Brief, Film DNA,
+// filmregler og aktiver (mastere, referencer, stemmer, samtykke) genbruges;
+// kun shotlisten skrives forfra. Produktionen kører videre på det godkendte
+// storyboard, til det nye er godkendt — så et afvist forsøg koster intet.
+function NewStoryboard({ d }: { d: FilmData }) {
+  const { busy, run } = useRun();
+  const key = useRef(new IdempotencyKey('storyboard-restart'));
+  const [confirm, setConfirm] = useState(false);
+  const sb = d.storyboard;
+  if (d.project.stage !== 'production' || sb?.status !== 'approved' || !d.brief) return null;
+
+  if (d.draft) {
+    const nd = d.draft.storyboard;
+    return (
+      <div className="card stack">
+        <Notice tone="info" action={
+          <div className="row">
+            <Button kind="approve" disabled={!!busy} onClick={() => run('ok', () => api.decide(nd.task_id, 'approved'), `Storyboard v${nd.version} er godkendt og bruges nu i produktionen.`)}>{texts.storyboard.approve}</Button>
+            <Button kind="reject" disabled={!!busy} onClick={() => run('no', () => api.decide(nd.task_id, 'rejected'), `Storyboard v${nd.version} er afvist. Produktionen bruger fortsat v${sb.version}.`)}>{texts.storyboard.reject}</Button>
+          </div>
+        }>
+          <strong>Nyt storyboard v{nd.version} venter på dig.</strong> Produktionen bruger stadig v{sb.version}, til du godkender. Du kan rette shots i shot-editoren, når det er godkendt.
+        </Notice>
+        <DraftList d={d} shots={d.draft.shots} total={Number(nd.total_seconds)} tagline={nd.tagline ?? null} />
+      </div>
+    );
+  }
+
+  const working = d.tasks.some((t) => t.type === 'storyboard.generate' && isRunning(t));
+  const problem = working ? null : lastProblem(d.tasks, 'storyboard.generate');
+  async function start() {
+    const r = await run('sb', () => api.generateStoryboard(d.brief!.id, key.current.get(), true), 'Det nye storyboard er klar til gennemsyn.');
+    if (r.ok) {
+      key.current.reset();
+      setConfirm(false);
+    }
+  }
+  return (
+    <div className="card">
+      <div className="row between">
+        <div>
+          <h3>Nyt storyboard</h3>
+          <p className="muted small">Instruktøren skriver en ny shotliste ud fra samme brief og Film DNA. Karakterer og locations genbruges med deres godkendte billeder, stemmer og samtykke. Storyboard v{sb.version} bruges, til du godkender det nye, og gemmes bagefter som historik.</p>
+        </div>
+        {!confirm && <Button disabled={!!busy || working} onClick={() => setConfirm(true)}>{working ? texts.storyboard.working : 'Lav nyt storyboard'}</Button>}
+      </div>
+      {problem && !confirm && <Notice tone="warn">{problem === 'stalled' ? 'Sidste forsøg blev ikke færdigt. Prøv igen.' : texts.errors.generationRetry}</Notice>}
+      {confirm && (
+        <Notice tone="warn" action={
+          <div className="row">
+            <Button kind="primary" disabled={!!busy} onClick={start}>{busy ? texts.storyboard.working : 'Ja, lav nyt storyboard'}</Button>
+            <Button kind="ghost" disabled={!!busy} onClick={() => setConfirm(false)}>Fortryd</Button>
+          </div>
+        }>
+          Godkender du det nye storyboard, skal startframes, replikker og videoer laves til dets shots. Det tager typisk 1–2 minutter at skrive.
+        </Notice>
+      )}
+    </div>
+  );
+}
+
+// Det nye storyboard som læsbar liste: der er endnu ingen billeder, så det,
+// der skal vurderes, er rækkefølge, vinkler, kamera, replikker og rytme.
+function DraftList({ d, shots, total, tagline }: { d: FilmData; shots: ShotRow[]; total: number; tagline: string | null }) {
+  const times = timecodes(shots);
+  const name = (id: string | null) => d.assets.find((a) => a.id === id)?.name ?? null;
+  return (
+    <div className="stack">
+      <span className="muted small">{shots.length} shots · {tc(total)}{tagline ? ` · slogan: “${tagline}”` : ''}</span>
+      <ol className="draftlist">
+        {shots.map((s) => {
+          const t = times.get(s.id)!;
+          const who = name(s.speaker_asset_id);
+          return (
+            <li key={s.id}>
+              <div className="row between">
+                <strong>{s.code} · {texts.shotTypes[s.shot_type] ?? s.shot_type}</strong>
+                <span className="muted small">{tc(t.start)}–{tc(t.end)} · {String(Number(s.duration_seconds)).replace('.', ',')} sek.</span>
+              </div>
+              <p>{s.action}</p>
+              <p className="muted small">Kamera: {s.camera}</p>
+              {s.dialogue && <p className="small"><em>“{s.dialogue}”</em> <span className="muted">— {who ?? 'taleren'}{s.dialogue_mode === 'voiceover' ? ' (voiceover)' : ''}</span></p>}
+              <Faces items={assetsFor(d, s).map((a) => ({ key: a.id, url: primaryReferenceUrl(d, a), title: a.name }))} />
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
 }
 
 function ShotCard({ d, s, filmId, t }: { d: FilmData; s: ShotRow; filmId: string; t: { start: number; end: number } }) {

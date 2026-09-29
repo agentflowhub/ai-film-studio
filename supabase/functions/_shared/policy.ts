@@ -57,6 +57,13 @@ export function canGenerateStoryboard(
   return { ok: true };
 }
 
+// I hvilken fase et storyboard må skrives: normalt i storyboard-fasen. En film
+// i produktion kan kun få et nyt, når brugeren beder om det (restart); det
+// gamle bruges så, til det nye er godkendt.
+export function storyboardStageAllowed(stage: string, restart: boolean): boolean {
+  return stage === 'storyboarding' || (stage === 'production' && restart);
+}
+
 export interface DecisionInput {
   taskStatus: string;
   existing: ApprovalState | null;

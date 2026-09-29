@@ -97,3 +97,24 @@ describe('decideClaim (idempotens)', () => {
     });
   });
 });
+
+describe('nyt storyboard til en film i produktion', () => {
+  it('kun i storyboard-fasen — eller i produktion, når brugeren beder om et nyt', async () => {
+    const { storyboardStageAllowed } = await import('../../supabase/functions/_shared/policy.ts');
+    expect(storyboardStageAllowed('storyboarding', false)).toBe(true);
+    expect(storyboardStageAllowed('production', false)).toBe(false);
+    expect(storyboardStageAllowed('production', true)).toBe(true);
+    expect(storyboardStageAllowed('briefing', true)).toBe(false);
+  });
+
+  it('instruktøren får filmens eksisterende aktiver at genbruge, som data', async () => {
+    const { storyboardUserMessage, STORYBOARD_SYSTEM_PROMPT } = await import('../../supabase/functions/_shared/prompts.ts');
+    const brief = { duration_seconds: 30 } as unknown as Parameters<typeof storyboardUserMessage>[0];
+    const msg = storyboardUserMessage(brief, null, 30, undefined, [{ kind: 'character', name: 'Lone', role: 'beboer' }]);
+    expect(msg).toContain('<eksisterende_aktiver>');
+    expect(msg).toContain('"name": "Lone"');
+    expect(msg).toContain('nøjagtig samme "kind" og "name"');
+    expect(storyboardUserMessage(brief, null, 30, undefined)).not.toContain('eksisterende_aktiver');
+    expect(STORYBOARD_SYSTEM_PROMPT).toContain('<eksisterende_aktiver>');
+  });
+});

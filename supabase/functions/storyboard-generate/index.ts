@@ -12,7 +12,7 @@ import { generateStructured, GenerateError } from '../_shared/claude.ts';
 import { claimTask, isOrgMember, markTaskFailed, nextVersion, recordUsage } from '../_shared/db.ts';
 import { apiError, errorText, json, log } from '../_shared/http.ts';
 import { modelFor } from '../_shared/model-config.ts';
-import { canGenerateStoryboard } from '../_shared/policy.ts';
+import { canGenerateStoryboard, storyboardStageAllowed } from '../_shared/policy.ts';
 import { STORYBOARD_SYSTEM_PROMPT, storyboardUserMessage } from '../_shared/prompts.ts';
 import { serve } from '../_shared/runtime.ts';
 import { shotAssetRole, toAssetRows } from '../_shared/assets.ts';
@@ -42,7 +42,9 @@ serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, us
   if (!policy.ok) return apiError(policy.code, 409);
 
   const stage = (brief.data.projects as unknown as { stage: string }).stage;
-  if (stage !== 'storyboarding') return apiError('wrong_stage', 409);
+  // I produktion kun som et bevidst nyt storyboard (restart). Produktionen
+  // kører videre på det godkendte, til det nye er godkendt.
+  if (!storyboardStageAllowed(stage, !!body.restart)) return apiError('wrong_stage', 409);
 
   const pending = await admin
     .from('storyboards')
@@ -61,6 +63,12 @@ serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, us
   const dnaRows = await admin.from('film_dna').select('fields, status').eq('project_id', projectId).order('version', { ascending: false });
   if (dnaRows.error) throw dnaRows.error;
   const dna = (dnaRows.data.find((d) => d.status === 'approved') ?? dnaRows.data[0])?.fields as Record<string, string> | undefined;
+
+  // Filmens eksisterende aktiver: instruktøren skal genbruge dem med samme navn,
+  // så godkendte mastere, referencer, stemmer og samtykke følger med.
+  const known = await admin.from('assets').select('kind, name, role').eq('project_id', projectId).order('code');
+  if (known.error) throw known.error;
+  const existingAssets = known.data.map((a) => ({ kind: a.kind as string, name: a.name as string, role: (a.role as string | null) ?? '' }));
 
   const config = modelFor('storyboard.generate', env);
   const claim = await claimTask(admin, {
@@ -86,7 +94,7 @@ serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, us
     const generated = await generateStructured(anthropic().beta.messages, {
       config,
       system: STORYBOARD_SYSTEM_PROMPT,
-      user: storyboardUserMessage(filmBrief, dna ?? null, filmBrief.duration_seconds, shotCount),
+      user: storyboardUserMessage(filmBrief, dna ?? null, filmBrief.duration_seconds, shotCount, existingAssets),
       schema: StoryboardDraftSchema,
     });
     await recordUsage(admin, { orgId, taskId: task.id, model: generated.model, ...generated.usage });
@@ -128,7 +136,7 @@ serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, us
       // nyt storyboard efter en afvisning); ellers opret et nyt som kladde.
       const existing = await admin
         .from('assets')
-        .select('id, code, kind, name, asset_versions!asset_versions_asset_id_fkey(id, version)')
+        .select('id, code, kind, name, master_version_id, asset_versions!asset_versions_asset_id_fkey(id, version)')
         .eq('project_id', projectId);
       if (existing.error) throw step('aktiver (læs)', existing.error);
       const rows = toAssetRows(fitted.draft.assets, new Set(existing.data.map((a) => a.code as string)));
@@ -136,8 +144,10 @@ serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, us
       for (const row of rows) {
         const match = existing.data.find((a) => a.kind === row.kind && String(a.name).toLowerCase() === row.name.toLowerCase());
         if (match) {
+          // Den godkendte master, hvis der er en — ellers den nyeste version.
           const versions = (match.asset_versions as { id: string; version: number }[]).sort((x, y) => y.version - x.version);
-          byKey.set(row.key, { assetId: match.id, versionId: versions[0]!.id, kind: row.kind });
+          const versionId = (match.master_version_id as string | null) ?? versions[0]!.id;
+          byKey.set(row.key, { assetId: match.id, versionId, kind: row.kind });
           continue;
         }
         const asset = await admin

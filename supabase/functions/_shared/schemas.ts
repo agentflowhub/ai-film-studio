@@ -189,6 +189,9 @@ export type BriefGenerateRequest = z.infer<typeof BriefGenerateRequestSchema>;
 export const StoryboardGenerateRequestSchema = z.object({
   brief_id: z.uuid(),
   idempotency_key: IdempotencyKey,
+  // Nyt storyboard til en film, der allerede er i produktion. Det gamle
+  // bruges, til det nye er godkendt; karakterer og locations genbruges.
+  restart: z.boolean().optional(),
 });
 export type StoryboardGenerateRequest = z.infer<typeof StoryboardGenerateRequestSchema>;
 

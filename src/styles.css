@@ -415,3 +415,6 @@ fieldset { border: none; padding: 0; margin: 0; min-width: 0; }
   background: radial-gradient(circle at 50% 40%, rgba(124, 108, 255, 0.25), #0f0f14 70%); font-size: 28px; padding: 12px; }
 .audiobox audio { width: 100%; max-width: 100%; }
 .field.check { flex-direction: row; align-items: center; gap: 8px; }
+.draftlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.draftlist li { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px; display: grid; gap: 4px; }
+.draftlist p { margin: 0; }
