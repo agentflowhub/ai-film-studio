@@ -95,7 +95,7 @@ async function tierOf(apiKey: string, fetchFn: typeof fetch): Promise<string | n
 // brugeren kan handle på.
 export function planHint(reason: string): string {
   return /cloned voices|library voices|upgrade your subscription/i.test(reason)
-    ? ' — stemmen kræver et betalt ElevenLabs-abonnement. Vælg en af standardstemmerne under Assets, eller opgradér hos ElevenLabs.'
+    ? ' — stemmen kræver et betalt ElevenLabs-abonnement. Vælg en af standardstemmerne under Karakterer, eller opgradér hos ElevenLabs.'
     : '';
 }
 
