@@ -1,7 +1,7 @@
 // Resultater fra billed- og videomodellerne: kort, stor visning og en liste,
 // hvor fejlede forsøg er foldet sammen, så de ikke fylder, men stadig kan ses.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { FilmData } from '../lib/data.ts';
 import { kr } from '../lib/shotState.ts';
 import { texts } from '../lib/texts.ts';
@@ -11,8 +11,8 @@ import { Button, StatusPill, Thumb } from './ui.tsx';
 type Review = (d: 'approved' | 'rejected') => void;
 
 // Stor visning. Lukkes med Esc eller et klik uden for billedet.
-export function Lightbox({ url, mime, title, onClose, onReview, busy }: {
-  url: string; mime?: string | null; title: string; onClose: () => void; onReview?: Review; busy?: boolean;
+export function Lightbox({ url, mime, title, onClose, onReview, busy, approveBlocked, children }: {
+  url: string; mime?: string | null; title: string; onClose: () => void; onReview?: Review; busy?: boolean; approveBlocked?: boolean; children?: ReactNode;
 }) {
   useEffect(() => {
     const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -23,12 +23,13 @@ export function Lightbox({ url, mime, title, onClose, onReview, busy }: {
     <div className="lightbox" role="dialog" aria-modal="true" aria-label={title} onClick={onClose}>
       <div className="lightbox-inner" onClick={(e) => e.stopPropagation()}>
         {mime?.startsWith('video/') ? <video src={url} controls autoPlay playsInline /> : <img src={url} alt={title} />}
+        {children}
         <div className="lightbox-bar">
           <strong>{title}</strong>
           <div className="row">
             {onReview && (
               <>
-                <Button kind="approve" disabled={busy} onClick={() => { onReview('approved'); onClose(); }}>{texts.common.approve}</Button>
+                <Button kind="approve" disabled={busy || approveBlocked} onClick={() => { onReview('approved'); onClose(); }}>{texts.common.approve}</Button>
                 <Button kind="reject" disabled={busy} onClick={() => { onReview('rejected'); onClose(); }}>{texts.common.reject}</Button>
               </>
             )}
@@ -55,6 +56,19 @@ export function ZoomThumb({ url, mime, alt, ratio, empty }: { url?: string | nul
   );
 }
 
+// En talende video godkendes først, når mennesket har set efter de to ting,
+// ingen model kan garantere: at munden følger lyden, og at det er den rigtige
+// person, der taler. Afkrydsningen gemmes ikke; den skal gøres pr. video.
+function SpeechCheck({ speaker, checks, onChange }: { speaker: string; checks: [boolean, boolean]; onChange: (c: [boolean, boolean]) => void }) {
+  return (
+    <fieldset className="speechcheck">
+      <legend className="small">Se videoen med lyd, før du godkender</legend>
+      <label className="small"><input type="checkbox" checked={checks[0]} onChange={(e) => onChange([e.target.checked, checks[1]])} /> Munden følger lyden hele vejen</label>
+      <label className="small"><input type="checkbox" checked={checks[1]} onChange={(e) => onChange([checks[0], e.target.checked])} /> Det er {speaker}, der taler, og ingen andre bevæger munden</label>
+    </fieldset>
+  );
+}
+
 const stateOf = (g: GenerationRow) =>
   g.status === 'queued' || g.status === 'running' ? 'generating'
     : g.status === 'failed' ? 'failed'
@@ -70,6 +84,12 @@ export function GenCard({ d, g, approved, busy, onReview, onRetry, label }: {
   const last = [...g.generation_attempts].sort((a, b) => b.attempt - a.attempt)[0];
   const state = stateOf(g);
   const title = `${label ? `${label} · ` : ''}v${g.version}`;
+  const plan = g.slot === 'video' ? d.plan?.shots.find((p) => p.shotId === g.shot_id) : undefined;
+  const speaker = plan?.dialogue ? plan.speaker?.name ?? 'taleren' : null;
+  const [checks, setChecks] = useState<[boolean, boolean]>([false, false]);
+  const needsCheck = !!speaker && state === 'needs_approval';
+  const blocked = needsCheck && !(checks[0] && checks[1]);
+  const check = needsCheck ? <SpeechCheck speaker={speaker!} checks={checks} onChange={setChecks} /> : null;
   return (
     <figure className={`gencard ${approved ? 'chosen' : ''}`}>
       {url && g.media?.mime.startsWith('audio/') ? (
@@ -89,16 +109,17 @@ export function GenCard({ d, g, approved, busy, onReview, onRetry, label }: {
           {state === 'failed' ? ' · intet betalt' : ` · ${kr(g.cost_actual_cents ?? g.cost_estimate_cents)}`}
         </span>
         {state === 'failed' && last?.error?.reason && <span className="small fail">{last.error.reason}</span>}
+        {check}
         {state === 'needs_approval' && (
           <div className="row">
-            <Button small kind="approve" disabled={busy} onClick={() => onReview('approved')}>{texts.common.approve}</Button>
+            <Button small kind="approve" disabled={busy || blocked} title={blocked ? 'Sæt begge flueben først' : undefined} onClick={() => onReview('approved')}>{texts.common.approve}</Button>
             <Button small kind="reject" disabled={busy} onClick={() => onReview('rejected')}>{texts.common.reject}</Button>
           </div>
         )}
         {state === 'failed' && onRetry && <Button small disabled={busy} onClick={onRetry}>Prøv igen</Button>}
       </figcaption>
       {open && url && !g.media?.mime.startsWith('audio/') && (
-        <Lightbox url={url} mime={g.media?.mime} title={title} busy={busy} onClose={() => setOpen(false)} onReview={state === 'needs_approval' ? onReview : undefined} />
+        <Lightbox url={url} mime={g.media?.mime} title={title} busy={busy} onClose={() => setOpen(false)} onReview={state === 'needs_approval' ? onReview : undefined} approveBlocked={blocked}>{check}</Lightbox>
       )}
     </figure>
   );

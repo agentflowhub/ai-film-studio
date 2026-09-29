@@ -403,6 +403,10 @@ fieldset { border: none; padding: 0; margin: 0; min-width: 0; }
 .lightbox-inner { display: flex; flex-direction: column; gap: 12px; max-width: min(1400px, 100%); max-height: 100%; }
 .lightbox-inner img, .lightbox-inner video { max-width: 100%; max-height: calc(100vh - 140px); object-fit: contain; border-radius: var(--radius-sm); background: #000; }
 .lightbox-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.speechcheck { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin: 6px 0; display: grid; gap: 6px; }
+.speechcheck legend { padding: 0 4px; }
+.speechcheck label { display: flex; gap: 8px; align-items: flex-start; }
+.lightbox .speechcheck { background: var(--surface); }
 .linklike { background: none; border: none; color: var(--muted); cursor: pointer; font: inherit; padding: 8px 0 0; text-decoration: underline; align-self: flex-start; }
 .linklike:hover { color: var(--text); }
 
