@@ -78,6 +78,8 @@ describe('Higgsfield', () => {
     expect(await a.submit('dop-standard', video, 'g:1')).toEqual({ providerJobId: 'hf_1' });
     expect(m.calls[0]!.url).toBe('https://api.higgsfield.ai/v1/image2video/dop');
     expect(m.calls[0]!.headers.Authorization).toBe('Key id:secret');
+    expect(m.calls[0]!.headers['hf-api-key']).toBe('id');
+    expect(m.calls[0]!.headers['hf-secret']).toBe('secret');
     expect(m.calls[0]!.body).toMatchObject({ model: 'dop-standard', input_images: [{ type: 'image_url', image_url: 'https://s/frame.png' }] });
   });
 

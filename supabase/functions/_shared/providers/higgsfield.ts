@@ -20,7 +20,14 @@ interface StatusBody {
 }
 
 export function createHiggsfield(credentials: string, settings: ProviderSettings['higgsfield'], models: ModelInfo[] = [...HIGGSFIELD_MODELS, ...HIGGSFIELD_SPEAK_MODELS], fetchFn: typeof fetch = fetch): ProviderAdapter {
-  const headers = { Authorization: `Key ${credentials}`, 'Content-Type': 'application/json', Accept: 'application/json' };
+  // Begge Higgsfield-formater: "Authorization: Key id:secret" (v2) og
+  // hf-api-key/hf-secret (v1). Samme nøglepar; Higgsfield accepterer det ene.
+  const [keyId, ...rest] = credentials.trim().replace(/^['"]|['"]$/g, '').split(':');
+  const secret = rest.join(':');
+  const headers = {
+    Authorization: `Key ${keyId}:${secret}`, 'hf-api-key': keyId ?? '', 'hf-secret': secret,
+    'Content-Type': 'application/json', Accept: 'application/json',
+  };
 
   async function get(id: string): Promise<StatusBody | null> {
     const res = await fetchFn(`${BASE}/requests/${encodeURIComponent(id)}/status`, { headers });
