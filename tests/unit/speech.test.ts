@@ -142,7 +142,7 @@ describe('Higgsfield Speak', () => {
 describe('registry', () => {
   it('ElevenLabs er kun med, når nøglen er sat; Speak følger Higgsfield', () => {
     expect(createRegistry(() => undefined).adapter('elevenlabs')).toBeNull();
-    const r = createRegistry((k) => ({ ELEVENLABS_API_KEY: 'xi', HIGGSFIELD_CREDENTIALS: 'a:b' })[k]);
+    const r = createRegistry((k) => ({ ELEVENLABS_API_KEY: 'xi', HIGGSFIELD_CREDENTIALS: 'keyid:secret' })[k]);
     expect(r.adapter('elevenlabs')).not.toBeNull();
     expect(r.models.map((m) => `${m.provider}/${m.model}`)).toEqual(expect.arrayContaining(['elevenlabs/eleven_v3', 'higgsfield/speak']));
   });

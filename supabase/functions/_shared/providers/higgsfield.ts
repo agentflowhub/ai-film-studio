@@ -1,7 +1,7 @@
 // Higgsfield som videoprovider (image-to-video fra den godkendte startframe).
 //
 // API: POST https://api.higgsfield.ai/<endpoint> med "Authorization: Key
-// KEY_ID:KEY_SECRET" → request_id. Status: GET /requests/<id>/status
+// <nøgle>" → request_id. Status: GET /requests/<id>/status
 // (queued | in_progress | completed | failed | nsfw). Stop: POST
 // /requests/<id>/cancel — kun muligt, mens jobbet står i kø; et job i gang kan
 // ikke stoppes. Ved failed og nsfw refunderer Higgsfield kreditterne.
@@ -20,13 +20,14 @@ interface StatusBody {
 }
 
 export function createHiggsfield(credentials: string, settings: ProviderSettings['higgsfield'], models: ModelInfo[] = [...HIGGSFIELD_MODELS, ...HIGGSFIELD_SPEAK_MODELS], fetchFn: typeof fetch = fetch): ProviderAdapter {
-  // Begge Higgsfield-formater: "Authorization: Key id:secret" (v2) og
-  // hf-api-key/hf-secret (v1). Samme nøglepar; Higgsfield accepterer det ene.
-  const [keyId, ...rest] = credentials.trim().replace(/^['"]|['"]$/g, '').split(':');
+  // Higgsfield-nøglen sendes som "Authorization: Key <nøgle>". Nyere nøgler er
+  // én streng; ældre er et par "id:secret", som også sendes i v1-formatet.
+  const key = credentials.trim().replace(/^['"]|['"]$/g, '');
+  const [keyId, ...rest] = key.split(':');
   const secret = rest.join(':');
-  const headers = {
-    Authorization: `Key ${keyId}:${secret}`, 'hf-api-key': keyId ?? '', 'hf-secret': secret,
-    'Content-Type': 'application/json', Accept: 'application/json',
+  const headers: Record<string, string> = {
+    Authorization: `Key ${key}`, 'Content-Type': 'application/json', Accept: 'application/json',
+    ...(secret ? { 'hf-api-key': keyId ?? '', 'hf-secret': secret } : {}),
   };
 
   async function get(id: string): Promise<StatusBody | null> {

@@ -33,7 +33,7 @@ porte, budgetfunktioner og Storage-bucket'en `media`).
 Kun som Supabase secrets — aldrig i koden eller i `.env`-filer, der committes.
 
 ```powershell
-npx supabase secrets set ANTHROPIC_API_KEY=... OPENAI_API_KEY=... HIGGSFIELD_CREDENTIALS=KEY_ID:KEY_SECRET ELEVENLABS_API_KEY=... WORKER_SECRET=<lang tilfældig streng> APP_ENV=production
+npx supabase secrets set ANTHROPIC_API_KEY=... OPENAI_API_KEY=... HIGGSFIELD_CREDENTIALS=<Higgsfield-nøgle> ELEVENLABS_API_KEY=... WORKER_SECRET=<lang tilfældig streng> APP_ENV=production
 ```
 
 På en betalt Supabase-plan kan Claude-kald få længere tid:

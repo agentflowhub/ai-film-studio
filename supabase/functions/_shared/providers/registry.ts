@@ -1,6 +1,7 @@
 // Hvilke providere findes? En provider er med, når dens hemmelighed er sat:
 //   OPENAI_API_KEY          → OpenAI (ChatGPT Images) til billeder
-//   HIGGSFIELD_CREDENTIALS  → Higgsfield til video og talende video ("KEY_ID:KEY_SECRET")
+//   HIGGSFIELD_CREDENTIALS  → Higgsfield til video og talende video (API-nøglen,
+//                             eller et ældre "KEY_ID:KEY_SECRET"-par)
 //   ELEVENLABS_API_KEY      → ElevenLabs til dansk tale
 // Simulatoren kan kun bruges, når ALLOW_SIMULATOR_PROVIDER=true — aldrig i produktion.
 
@@ -30,7 +31,7 @@ export function createRegistry(getEnv: (key: string) => string | undefined, fetc
     models.push(...m);
   }
   const hf = getEnv('HIGGSFIELD_CREDENTIALS')?.trim();
-  if (hf && hf.includes(':')) {
+  if (hf && hf.length >= 8) {
     const m = withPrices([...HIGGSFIELD_MODELS, ...HIGGSFIELD_SPEAK_MODELS], getEnv);
     adapters.set('higgsfield', createHiggsfield(hf, settings.higgsfield, m, fetchFn));
     models.push(...m);

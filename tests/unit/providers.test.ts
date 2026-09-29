@@ -83,6 +83,13 @@ describe('Higgsfield', () => {
     expect(m.calls[0]!.body).toMatchObject({ model: 'dop-standard', input_images: [{ type: 'image_url', image_url: 'https://s/frame.png' }] });
   });
 
+  it('en ny enkelt-nøgle sendes som "Key <nøgle>"', async () => {
+    const m = mockFetch(() => ({ json: { request_id: 'hf_2' } }));
+    await createHiggsfield('9a76abcdef157c', settings.higgsfield, HIGGSFIELD_MODELS, m.fn).submit('dop-standard', { ...video }, 'g:1');
+    expect(m.calls[0]!.headers.Authorization).toBe('Key 9a76abcdef157c');
+    expect(m.calls[0]!.headers['hf-secret']).toBeUndefined();
+  });
+
   it('uden startframe oprettes intet job', async () => {
     const m = mockFetch(() => ({}));
     await expect(createHiggsfield('a:b', settings.higgsfield, HIGGSFIELD_MODELS, m.fn).submit('dop-turbo', req, 'x')).rejects.toBeInstanceOf(ProviderRejectedError);
@@ -119,7 +126,8 @@ describe('registry og priser', () => {
     expect(new Set(r.models.map((m) => m.provider))).toEqual(new Set(['openai', 'higgsfield']));
     expect(r.adapter('openai')).not.toBeNull();
     expect(r.models.some((m) => m.simulated)).toBe(false);
-    expect(createRegistry((k) => ({ HIGGSFIELD_CREDENTIALS: 'uden-kolon' })[k]).adapter('higgsfield')).toBeNull();
+    expect(createRegistry((k) => ({ HIGGSFIELD_CREDENTIALS: 'kort' })[k]).adapter('higgsfield')).toBeNull();
+    expect(createRegistry((k) => ({ HIGGSFIELD_CREDENTIALS: '9a76abcdef157c' })[k]).adapter('higgsfield')).not.toBeNull();
   });
 
   it('priser kan rettes pr. model med en miljøvariabel', () => {
@@ -131,7 +139,7 @@ describe('registry og priser', () => {
   });
 
   it('routeren vælger ChatGPT Images til billeder og Higgsfield til video, med reserve', () => {
-    const models = createRegistry((k) => ({ OPENAI_API_KEY: 'sk', HIGGSFIELD_CREDENTIALS: 'a:b' })[k]).models;
+    const models = createRegistry((k) => ({ OPENAI_API_KEY: 'sk', HIGGSFIELD_CREDENTIALS: 'keyid:secret' })[k]).models;
     const frame = recommend(models, { slot: 'start_frame', referenceImages: 12, hasCharacters: true }, { allowSimulated: false });
     expect(frame.pick).toMatchObject({ provider: 'openai', model: 'gpt-image-2.5-sunburst' });
     expect(frame.fallback).toMatchObject({ provider: 'openai', model: 'gpt-image-2.5-flare' });
