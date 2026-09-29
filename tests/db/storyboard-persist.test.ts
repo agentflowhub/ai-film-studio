@@ -27,13 +27,14 @@ const draft: StoryboardDraft = {
     { key: 'lejlighed', kind: 'location', name: 'Lejligheden', role: 'Hovedlocation', attributes: [{ name: 'Lys', value: 'blødt dagslys', contradictions: [] }] },
     { key: 'telefon', kind: 'prop', name: 'Mobiltelefonen', role: 'Viser appen', attributes: [{ name: 'Model', value: 'sort smartphone', contradictions: [] }] },
   ],
+  tagline: null,
   scenes: [
     { heading: 'Køkkenet, morgen', purpose: 'Vandhanen drypper.', shots: [
-      { duration_seconds: 3.5, shot_type: 'close_up', lens_mm: 85, movement: 'static', camera: 'Nær på vandhanen', action: 'Vandhanen drypper.', dialogue: null, performance: null, lighting: 'morgenlys', audio: 'dryp', asset_keys: ['lejlighed'], speaker_key: null },
-      { duration_seconds: 4, shot_type: 'medium', lens_mm: 35, movement: 'handheld', camera: 'Håndholdt', action: 'Beboeren sukker og tager telefonen frem.', dialogue: '', performance: 'Træt', lighting: null, audio: null, asset_keys: ['beboer', 'telefon', 'lejlighed', 'beboer'], speaker_key: 'beboer' },
+      { duration_seconds: 3.5, shot_type: 'close_up', lens_mm: 85, movement: 'static', camera: 'Nær på vandhanen', action: 'Vandhanen drypper.', dialogue: null, performance: null, lighting: 'morgenlys', audio: 'dryp', asset_keys: ['lejlighed'], speaker_key: null, dialogue_mode: 'on_camera' as const },
+      { duration_seconds: 4, shot_type: 'medium', lens_mm: 35, movement: 'handheld', camera: 'Håndholdt', action: 'Beboeren sukker og tager telefonen frem.', dialogue: '', performance: 'Træt', lighting: null, audio: null, asset_keys: ['beboer', 'telefon', 'lejlighed', 'beboer'], speaker_key: 'beboer', dialogue_mode: 'on_camera' as const },
     ] },
     { heading: 'Opgangen', purpose: 'Viceværten svarer.', shots: [
-      { duration_seconds: 4, shot_type: 'over_the_shoulder', lens_mm: null, movement: 'dolly', camera: 'Over skulderen', action: 'Viceværten læser beskeden i appen.', dialogue: 'Den er klaret i dag.', performance: 'Venlig', lighting: null, audio: null, asset_keys: ['vicevaert', 'telefon'], speaker_key: 'vicevaert' },
+      { duration_seconds: 4, shot_type: 'over_the_shoulder', lens_mm: null, movement: 'dolly', camera: 'Over skulderen', action: 'Viceværten læser beskeden i appen.', dialogue: 'Den er klaret i dag.', performance: 'Venlig', lighting: null, audio: null, asset_keys: ['vicevaert', 'telefon'], speaker_key: 'vicevaert', dialogue_mode: 'on_camera' as const },
     ] },
   ],
 };

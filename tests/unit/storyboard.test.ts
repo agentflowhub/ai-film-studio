@@ -15,12 +15,13 @@ function shot(duration: number) {
     lighting: null,
     audio: null,
     asset_keys: ['hovedperson', 'koekken', 'hovedperson'],
-    speaker_key: null,
+    speaker_key: null, dialogue_mode: 'on_camera' as const,
   };
 }
 
 function draft(...scenes: number[][]): StoryboardDraft {
   return {
+    tagline: null,
     assets: [{ key: 'hovedperson', kind: 'character' as const, name: 'Sander', role: 'Testkarakter', attributes: [{ name: 'Hår', value: 'gråt', contradictions: ['blondt'] }] }],
     scenes: scenes.map((durations, i) => ({
       heading: `Scene ${i + 1}`,
@@ -101,8 +102,8 @@ describe('flattenShots', () => {
 describe('objektiv uden for databasens grænser', () => {
   it('udelades i stedet for at afvise storyboardet', async () => {
     const { flattenShots } = await import('../../supabase/functions/_shared/storyboard.ts');
-    const shot = { duration_seconds: 3, shot_type: 'wide' as const, movement: 'static' as const, camera: 'k', action: 'a', dialogue: null, performance: null, lighting: null, audio: null, asset_keys: ['x'], speaker_key: null };
-    const flat = flattenShots({ assets: [], scenes: [{ heading: 'h', purpose: 'p', shots: [{ ...shot, lens_mm: 4 }, { ...shot, lens_mm: 50 }, { ...shot, lens_mm: 1200 }] }] });
+    const shot = { duration_seconds: 3, shot_type: 'wide' as const, movement: 'static' as const, camera: 'k', action: 'a', dialogue: null, performance: null, lighting: null, audio: null, asset_keys: ['x'], speaker_key: null, dialogue_mode: 'on_camera' as const };
+    const flat = flattenShots({ assets: [], tagline: null, scenes: [{ heading: 'h', purpose: 'p', shots: [{ ...shot, lens_mm: 4 }, { ...shot, lens_mm: 50 }, { ...shot, lens_mm: 1200 }] }] });
     expect(flat.map((s) => s.lens_mm)).toEqual([null, 50, null]);
   });
 });
@@ -112,5 +113,24 @@ describe('errorText', () => {
     const { errorText } = await import('../../supabase/functions/_shared/http.ts');
     expect(errorText({ code: '23514', message: 'new row violates check constraint "x"', details: null, hint: null })).toBe('23514 · new row violates check constraint "x"');
     expect(errorText(new Error('boom'))).toBe('boom');
+  });
+});
+
+describe('voiceover i storyboardet', () => {
+  const base = { duration_seconds: 3, shot_type: 'wide' as const, lens_mm: null, movement: 'static' as const, camera: 'k', action: 'a', performance: null, lighting: null, audio: null, asset_keys: ['koekken'] };
+  const assets = [
+    { key: 'sander', kind: 'character' as const, name: 'Sander', role: 'r', attributes: [] },
+    { key: 'koekken', kind: 'location' as const, name: 'Køkken', role: 'r', attributes: [] },
+  ];
+  const flat = (shot: Partial<typeof base> & { dialogue: string | null; dialogue_mode: 'on_camera' | 'voiceover'; speaker_key: string | null }) =>
+    flattenShots({ assets, tagline: 'Sov godt', scenes: [{ heading: 'h', purpose: 'p', shots: [{ ...base, ...shot }] }] })[0]!;
+
+  it('en voiceover-taler må mangle i shottet (stemmen over et dækbillede)', () => {
+    expect(flat({ dialogue: 'Der skal mængder til.', dialogue_mode: 'voiceover', speaker_key: 'sander' })).toMatchObject({ speaker_key: 'sander', dialogue_mode: 'voiceover' });
+  });
+
+  it('en on_camera-taler skal være i shottet, og taleren skal være en karakter', () => {
+    expect(flat({ dialogue: 'Hej', dialogue_mode: 'on_camera', speaker_key: 'sander' }).speaker_key).toBeNull();
+    expect(flat({ dialogue: 'Hej', dialogue_mode: 'voiceover', speaker_key: 'koekken' }).speaker_key).toBeNull();
   });
 });

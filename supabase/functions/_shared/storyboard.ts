@@ -22,6 +22,7 @@ export interface FlatShot {
   camera: string;
   action: string;
   dialogue: string | null;
+  dialogue_mode: 'on_camera' | 'voiceover';
   performance: string | null;
   lighting: string | null;
   audio: string | null;
@@ -89,6 +90,7 @@ export function fitToDuration(draft: StoryboardDraft, targetSeconds: number): Fi
 
 export function flattenShots(draft: StoryboardDraft): FlatShot[] {
   let n = 0;
+  const characters = new Set(draft.assets.filter((a) => a.kind === 'character').map((a) => a.key));
   return draft.scenes.flatMap((scene, sceneIndex) =>
     scene.shots.map((shot, shotIndex) => ({
       code: 'SHOT_' + String(++n).padStart(2, '0'),
@@ -102,12 +104,15 @@ export function flattenShots(draft: StoryboardDraft): FlatShot[] {
       camera: shot.camera,
       action: shot.action,
       dialogue: shot.dialogue && shot.dialogue.trim() ? shot.dialogue : null,
+      dialogue_mode: shot.dialogue_mode,
       performance: shot.performance,
       lighting: shot.lighting,
       audio: shot.audio,
       asset_keys: [...new Set(shot.asset_keys)],
-      // Taleren tæller kun, når shottet har en replik, og taleren er med i shottet.
-      speaker_key: shot.dialogue?.trim() && shot.speaker_key && shot.asset_keys.includes(shot.speaker_key) ? shot.speaker_key : null,
+      // Taleren tæller kun, når shottet har en replik. Ses taleren (on_camera),
+      // skal den være med i shottet; en voiceover kan være enhver karakter.
+      speaker_key: shot.dialogue?.trim() && shot.speaker_key && characters.has(shot.speaker_key)
+        && (shot.dialogue_mode === 'voiceover' || shot.asset_keys.includes(shot.speaker_key)) ? shot.speaker_key : null,
     })),
   );
 }

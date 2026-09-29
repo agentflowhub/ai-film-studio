@@ -113,6 +113,8 @@ export const SHOT_TYPES = [
 ] as const;
 
 export const MOVEMENTS = ['static', 'pan', 'tilt', 'handheld', 'dolly', 'optical_zoom'] as const;
+// Ses taleren og følger munden replikken, eller høres stemmen over billedet?
+export const DIALOGUE_MODES = ['on_camera', 'voiceover'] as const;
 export const ASSET_KINDS = ['character', 'location', 'vehicle', 'prop'] as const;
 
 export const AssetDraftSchema = z.object({
@@ -136,14 +138,16 @@ export const ShotDraftSchema = z.object({
   shot_type: z.enum(SHOT_TYPES),
   lens_mm: z.number().int().nullable(),
   movement: z.enum(MOVEMENTS),
+  // Hvor kameraet står, og hvordan kameramanden opfører sig i shottet.
   camera: z.string().min(1).max(300),
   action: z.string().min(1).max(800),
   dialogue: z.string().max(800).nullable(),
+  dialogue_mode: z.enum(DIALOGUE_MODES),
   performance: z.string().max(80).nullable(),
   lighting: z.string().max(200).nullable(),
   audio: z.string().max(200).nullable(),
   asset_keys: z.array(z.string()).min(1).max(10),
-  // Hvem siger replikken: nøglen på en karakter i asset_keys. null uden replik.
+  // Hvem siger replikken: nøglen på en karakter (i shottet, hvis on_camera). null uden replik.
   speaker_key: z.string().nullable(),
 });
 export type ShotDraft = z.infer<typeof ShotDraftSchema>;
@@ -158,6 +162,8 @@ export type SceneDraft = z.infer<typeof SceneDraftSchema>;
 export const StoryboardDraftSchema = z.object({
   assets: z.array(AssetDraftSchema).min(1).max(30),
   scenes: z.array(SceneDraftSchema).min(1).max(30),
+  // Slogan/payoff til slutningen af filmen; null, hvis filmen ikke skal have et.
+  tagline: z.string().max(120).nullable(),
 });
 export type StoryboardDraft = z.infer<typeof StoryboardDraftSchema>;
 
