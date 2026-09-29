@@ -89,7 +89,8 @@ export function GenCard({ d, g, approved, busy, onReview, onRetry, label }: {
   const state = stateOf(g);
   const title = `${label ? `${label} · ` : ''}v${g.version}`;
   const plan = g.slot === 'video' ? d.plan?.shots.find((p) => p.shotId === g.shot_id) : undefined;
-  const speaker = plan?.dialogue ? plan.speaker?.name ?? 'taleren' : null;
+  // Mund og taler tjekkes kun, når taleren ses; en voiceover har ingen læbesynk.
+  const speaker = plan?.dialogue && plan.dialogueMode !== 'voiceover' ? plan.speaker?.name ?? 'taleren' : null;
   const shot = g.slot === 'video' ? d.shots.find((s) => s.id === g.shot_id) : undefined;
   const people = !!shot?.shot_assets.some((sa) => d.assets.find((a) => a.id === sa.asset_id)?.kind === 'character');
   const items = g.slot === 'video' ? videoChecks(speaker, people) : [];

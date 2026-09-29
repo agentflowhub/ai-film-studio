@@ -15,7 +15,7 @@ function plan(over: Partial<ShotPlanView> = {}): ShotPlanView {
   return {
     shotId: 's1', code: '01',
     frame: { status: 'draft', generationId: null }, video: { status: 'draft', generationId: null },
-    dialogue: null, speaker: null,
+    dialogue: null, dialogueMode: 'on_camera', speaker: null,
     gates: { frame: ok, video: no, dialogue: [] }, conflicts: [], stale: [],
     prompts: { start_frame: { text: '', hash: '' }, video: { text: '', hash: '' }, dialogue: null },
     reco: { start_frame: reco, video: reco, dialogue: null },

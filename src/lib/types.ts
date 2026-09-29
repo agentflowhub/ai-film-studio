@@ -52,6 +52,8 @@ export interface StoryboardRow {
   version: number;
   status: OutputStatus;
   total_seconds: number;
+  // Storyboardets forslag til slogan i slutningen af filmen.
+  tagline?: string | null;
 }
 
 export interface ShotRow {
@@ -75,6 +77,8 @@ export interface ShotRow {
   approved_video_id: string | null;
   speaker_asset_id: string | null;
   approved_dialogue_id: string | null;
+  // 'voiceover': stemmen høres over billedet uden læbesynk.
+  dialogue_mode: 'on_camera' | 'voiceover';
   shot_assets: { asset_id: string; asset_version_id: string; pinned: boolean }[];
 }
 
@@ -155,6 +159,7 @@ export interface ShotPlanView {
   frame: { status: SlotStatus; generationId: string | null };
   video: { status: SlotStatus; generationId: string | null };
   dialogue: { status: SlotStatus; generationId: string | null } | null;
+  dialogueMode: 'on_camera' | 'voiceover';
   speaker: { assetId: string; name: string; voiceId: string | null; voiceName: string | null } | null;
   gates: { frame: Gate[]; video: Gate[]; dialogue: Gate[] };
   conflicts: Conflict[];

@@ -87,8 +87,10 @@ function Instruction({ d, shot }: { d: FilmData; shot: ShotRow }) {
     action: shot.action, dialogue: shot.dialogue ?? '', notes: shot.notes ?? '', duration_seconds: Number(shot.duration_seconds),
     shot_type: shot.shot_type, lens_mm: shot.lens_mm ? String(shot.lens_mm) : '', movement: shot.movement,
     performance: shot.performance ?? '', lighting: shot.lighting ?? '', speaker_asset_id: shot.speaker_asset_id ?? '',
+    camera: shot.camera ?? '', dialogue_mode: shot.dialogue_mode ?? 'on_camera',
   });
-  const characters = assetsFor(d, shot).filter((a) => a.kind === 'character');
+  // En voiceover kan siges af enhver karakter i filmen; ses taleren, skal den være i shottet.
+  const characters = (f.dialogue_mode === 'voiceover' ? d.assets : assetsFor(d, shot)).filter((a) => a.kind === 'character');
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
   const locked = d.storyboard?.status !== 'approved' && d.storyboard?.status !== 'pending_approval';
   async function save(e: FormEvent) {
@@ -98,11 +100,12 @@ function Instruction({ d, shot }: { d: FilmData; shot: ShotRow }) {
       action: f.action.trim(), dialogue: nul(f.dialogue), notes: nul(f.notes), duration_seconds: f.duration_seconds,
       shot_type: f.shot_type, lens_mm: f.lens_mm ? Number(f.lens_mm) : null, movement: f.movement,
       performance: nul(f.performance), lighting: nul(f.lighting), speaker_asset_id: f.speaker_asset_id || null,
+      camera: f.camera.trim() || shot.camera, dialogue_mode: f.dialogue_mode,
     };
     const before: Record<string, unknown> = {
       action: shot.action, dialogue: shot.dialogue, notes: shot.notes, duration_seconds: Number(shot.duration_seconds),
       shot_type: shot.shot_type, lens_mm: shot.lens_mm, movement: shot.movement, performance: shot.performance, lighting: shot.lighting,
-      speaker_asset_id: shot.speaker_asset_id,
+      speaker_asset_id: shot.speaker_asset_id, camera: shot.camera, dialogue_mode: shot.dialogue_mode ?? 'on_camera',
     };
     const changes = Object.fromEntries(Object.entries(next).filter(([k, v]) => v !== before[k]));
     if (!Object.keys(changes).length) return flash('Der er ingen ændringer at gemme.', 'info');
@@ -117,9 +120,15 @@ function Instruction({ d, shot }: { d: FilmData; shot: ShotRow }) {
       <fieldset className="form full" disabled={locked || !!busy}>
         <label className="field full">Handling<textarea rows={4} required maxLength={800} value={f.action} onChange={(e) => set('action', e.target.value)} /></label>
         <label className="field">Replik <span className="hint">dansk tale, valgfrit</span><input maxLength={800} value={f.dialogue} onChange={(e) => set('dialogue', e.target.value)} /></label>
+        <label className="field">Sådan høres den
+          <select value={f.dialogue_mode} onChange={(e) => setF((x) => ({ ...x, dialogue_mode: e.target.value as 'on_camera' | 'voiceover', speaker_asset_id: '' }))} disabled={!f.dialogue.trim()}>
+            <option value="on_camera">Taleren ses — munden følger replikken</option>
+            <option value="voiceover">Voiceover — stemmen over billedet</option>
+          </select>
+        </label>
         <label className="field">Hvem siger den?
           <select value={f.speaker_asset_id} onChange={(e) => set('speaker_asset_id', e.target.value)} disabled={!f.dialogue.trim() || !characters.length}>
-            <option value="">{characters.length ? `Automatisk (${characters[0]!.name})` : 'Ingen karakterer i shottet'}</option>
+            <option value="">{characters.length ? `Automatisk (${characters[0]!.name})` : f.dialogue_mode === 'voiceover' ? 'Filmen har ingen karakterer' : 'Ingen karakterer i shottet'}</option>
             {characters.map((a) => <option key={a.id} value={a.id}>{a.name}{a.voice_name ? ` · ${a.voice_name}` : ' · mangler stemme'}</option>)}
           </select>
         </label>
@@ -127,6 +136,7 @@ function Instruction({ d, shot }: { d: FilmData; shot: ShotRow }) {
         <label className="field">Kamerabevægelse<select value={f.movement} onChange={(e) => set('movement', e.target.value)}>{Object.entries(texts.movements).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
         <label className="field">Længde <span className="hint">sekunder</span><input type="number" min={1} max={15} step={0.5} value={f.duration_seconds} onChange={(e) => set('duration_seconds', Number(e.target.value))} /></label>
         <label className="field">Objektiv <span className="hint">mm, valgfrit</span><input type="number" min={8} max={600} value={f.lens_mm} onChange={(e) => set('lens_mm', e.target.value)} /></label>
+        <label className="field full">Kamera <span className="hint">hvor kameraet står, og hvad kameramanden gør undervejs</span><textarea rows={2} maxLength={300} value={f.camera} onChange={(e) => set('camera', e.target.value)} /></label>
         <label className="field">Spil<input maxLength={80} value={f.performance} onChange={(e) => set('performance', e.target.value)} /></label>
         <label className="field">Lys<input maxLength={200} value={f.lighting} onChange={(e) => set('lighting', e.target.value)} /></label>
         <label className="field full">Noter<textarea rows={2} maxLength={800} value={f.notes} onChange={(e) => set('notes', e.target.value)} /></label>
@@ -290,8 +300,11 @@ function Results({ d, shot, p, choice }: { d: FilmData; shot: ShotRow; p?: ShotP
         const gates = p ? (slot === 'start_frame' ? p.gates.frame : slot === 'dialogue' ? p.gates.dialogue : p.gates.video) : [];
         const approvedId = slot === 'start_frame' ? shot.approved_start_frame_id : slot === 'dialogue' ? shot.approved_dialogue_id : shot.approved_video_id;
         const picked = slot === 'dialogue' ? null : choice[slot];
-        const title = slot === 'start_frame' ? 'Startframe' : slot === 'dialogue' ? 'Replik (dansk tale)' : p?.dialogue ? 'Video med tale' : 'Video';
-        const approvedText = slot === 'dialogue' ? 'Replikken er godkendt. Videoen kan nu laves, så munden følger den.' : `${slot === 'video' ? 'Videoen' : 'Startframen'} er godkendt.`;
+        const voiceover = p?.dialogueMode === 'voiceover';
+        const title = slot === 'start_frame' ? 'Startframe' : slot === 'dialogue' ? (voiceover ? 'Voiceover (dansk tale)' : 'Replik (dansk tale)') : p?.dialogue && !voiceover ? 'Video med tale' : 'Video';
+        const approvedText = slot === 'dialogue'
+          ? (voiceover ? 'Voiceoveren er godkendt. Den lægges over billedet, når filmen samles.' : 'Replikken er godkendt. Videoen kan nu laves, så munden følger den.')
+          : `${slot === 'video' ? 'Videoen' : 'Startframen'} er godkendt.`;
         return (
           <div key={slot} className="card">
             <div className="row between">
