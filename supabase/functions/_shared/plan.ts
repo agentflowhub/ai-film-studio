@@ -50,6 +50,8 @@ export interface PlanShot {
   shot_type: string;
   lens_mm: number | null;
   movement: string;
+  // Hvor kameraet står, og hvordan kameramanden opfører sig.
+  camera?: string | null;
   action: string;
   notes: string | null;
   performance: string | null;
@@ -62,6 +64,8 @@ export interface PlanShot {
   dialogue?: string | null;
   speaker_asset_id?: string | null;
   approved_dialogue_id?: string | null;
+  // 'voiceover': stemmen høres over billedet uden læbesynk.
+  dialogue_mode?: 'on_camera' | 'voiceover';
   links: { asset_id: string; asset_version_id: string; pinned: boolean }[];
   deviations: (DeviationInput & { shot_value: string })[];
   generations: PlanGeneration[];
@@ -87,6 +91,8 @@ export interface ShotPlan {
   video: { status: SlotStatus; generationId: string | null };
   // Kun for shots med en replik.
   dialogue: { status: SlotStatus; generationId: string | null } | null;
+  // Ses taleren (munden følger lyden), eller er replikken en voiceover?
+  dialogueMode: 'on_camera' | 'voiceover';
   speaker: { assetId: string; name: string; voiceId: string | null; voiceName: string | null } | null;
   gates: { frame: Gate[]; video: Gate[]; dialogue: Gate[] };
   conflicts: Conflict[];
@@ -166,18 +172,23 @@ export async function planProject(input: PlanInput): Promise<ProjectPlan> {
       return { value: d.shot_value, ruleText: input.rules.find((r) => r.id === d.ruleId)?.text };
     });
     // Dansk tale: shottet har en replik og en karakter, der siger den — den
-    // valgte taler, ellers den første karakter i shottet.
+    // valgte taler, ellers den første karakter i shottet. En voiceover-taler
+    // behøver ikke være med i shottet; stemmen høres over billedet.
     const line = s.dialogue?.trim() ? s.dialogue.trim() : null;
-    const speakerAsset = line
-      ? (linked.find(({ asset }) => asset.id === s.speaker_asset_id && asset.kind === 'character') ?? linked.find(({ asset }) => asset.kind === 'character'))?.asset ?? null
-      : null;
-    const speech = !!(line && speakerAsset);
+    const voiceover = s.dialogue_mode === 'voiceover';
+    const chosen = s.speaker_asset_id ? assetById.get(s.speaker_asset_id) : undefined;
+    const speakerAsset = !line ? null
+      : voiceover && chosen?.kind === 'character' ? chosen
+        : (linked.find(({ asset }) => asset.id === s.speaker_asset_id && asset.kind === 'character') ?? linked.find(({ asset }) => asset.kind === 'character'))?.asset ?? null;
+    // Replik-lyd laves for begge slags; læbesynk (Speak) kun, når taleren ses.
+    const hasLine = !!(line && speakerAsset);
+    const speech = hasLine && !voiceover;
     const promptFor = async (slot: 'start_frame' | 'video') => {
       const compiled = compilePrompt({
         slot,
         dna: input.dna ? { version: input.dna.version, fields: input.dna.fields } : { version: 0, fields: {} },
         rules: activeRules,
-        shot: { duration_seconds: s.duration_seconds, shot_type: s.shot_type, lens_mm: s.lens_mm, movement: s.movement, action: s.action, notes: s.notes, performance: s.performance, lighting: s.lighting },
+        shot: { duration_seconds: s.duration_seconds, shot_type: s.shot_type, lens_mm: s.lens_mm, movement: s.movement, camera: s.camera ?? null, action: s.action, notes: s.notes, performance: s.performance, lighting: s.lighting },
         assets: linked.map(({ asset, version }) => ({ code: asset.code, kind: asset.kind, name: asset.name, version: version.version, attributes: version.attributes, referenceCount: version.referenceCount })),
         deviations,
         startFrameId: slot === 'video' ? s.approved_start_frame_id : undefined,
@@ -190,14 +201,14 @@ export async function planProject(input: PlanInput): Promise<ProjectPlan> {
       const canonical = canonicalJson({ slot: 'dialogue', line, speaker: speakerAsset!.code, voice: speakerAsset!.voice_id ?? null, language: 'da' });
       return { text: line!, canonical, hash: await sha256Hex(canonical) };
     };
-    const prompts = { start_frame: await promptFor('start_frame'), video: await promptFor('video'), dialogue: speech ? await dialoguePrompt() : null };
+    const prompts = { start_frame: await promptFor('start_frame'), video: await promptFor('video'), dialogue: hasLine ? await dialoguePrompt() : null };
 
     const hasCharacters = linked.some(({ asset }) => asset.kind === 'character');
     const refs = linked.reduce((n, { version }) => n + Math.min(version.referenceCount, 4), 0);
     const reco = {
       start_frame: recommend(input.models, { slot: 'start_frame', referenceImages: refs, hasCharacters }, { allowSimulated: input.allowSimulated, choice: input.choices?.[`${s.id}:start_frame`] }),
       video: recommend(input.models, { slot: 'video', speech, durationSeconds: s.duration_seconds, movement: speech ? undefined : s.movement, referenceImages: 1, hasCharacters }, { allowSimulated: input.allowSimulated, choice: input.choices?.[`${s.id}:video`] }),
-      dialogue: speech ? recommend(input.models, { slot: 'dialogue', referenceImages: 0, hasCharacters: true }, { allowSimulated: input.allowSimulated, choice: input.choices?.[`${s.id}:dialogue`] }) : null,
+      dialogue: hasLine ? recommend(input.models, { slot: 'dialogue', referenceImages: 0, hasCharacters: true }, { allowSimulated: input.allowSimulated, choice: input.choices?.[`${s.id}:dialogue`] }) : null,
     };
 
     const lf = latestOf(s.generations, 'start_frame');
@@ -207,7 +218,8 @@ export async function planProject(input: PlanInput): Promise<ProjectPlan> {
     const dialogue = prompts.dialogue ? { status: slotStatus(ld, prompts.dialogue.hash), generationId: ld?.id ?? null } : null;
     let videoStatus = slotStatus(lv, prompts.video.hash);
     if ((videoStatus === 'approved' || videoStatus === 'needs_approval') && s.start_frame_required && frame.status !== 'approved') videoStatus = 'outdated';
-    if ((videoStatus === 'approved' || videoStatus === 'needs_approval') && dialogue && dialogue.status !== 'approved') videoStatus = 'outdated';
+    // Kun en talende video bygger på replik-lyden; en voiceover lægges på bagefter.
+    if ((videoStatus === 'approved' || videoStatus === 'needs_approval') && speech && dialogue && dialogue.status !== 'approved') videoStatus = 'outdated';
     const video = { status: videoStatus, generationId: lv?.id ?? null };
 
     const missingMaster = linked.filter(({ asset }) => !asset.master_version_id).map(({ asset }) => asset.name);
@@ -222,22 +234,24 @@ export async function planProject(input: PlanInput): Promise<ProjectPlan> {
       { ok: !open.length, text: open.length ? `${open.length === 1 ? 'Én konflikt' : `${open.length} konflikter`} skal afklares` : 'Ingen kontinuitetskonflikter' },
       { ok: !!reco.start_frame.pick, text: reco.start_frame.pick ? `Model: ${reco.start_frame.pick.label}` : 'Ingen billedmodel kan lave dette shot' },
     ];
-    const dialogueGates: Gate[] = speech ? [
+    // Taleren kan være uden for shottet (voiceover), så dens samtykke tjekkes for sig.
+    const speakerConsent = !speakerAsset || speakerAsset.consent_status === 'confirmed';
+    const dialogueGates: Gate[] = hasLine ? [
       frameGates[0]!,
-      { ok: !noConsent.length, text: noConsent.length ? `Samtykke mangler: ${noConsent.join(', ')}` : 'Samtykke foreligger for alle karakterer' },
+      { ok: !noConsent.length && speakerConsent, text: noConsent.length || !speakerConsent ? `Samtykke mangler: ${[...new Set([...noConsent, ...(speakerConsent ? [] : [speakerAsset!.name])])].join(', ')}` : 'Samtykke foreligger for alle karakterer' },
       { ok: !!speakerAsset!.voice_id, text: speakerAsset!.voice_id ? `Stemme: ${speakerAsset!.voice_name ?? speakerAsset!.name}` : `Vælg en stemme til ${speakerAsset!.name}` },
       { ok: !!reco.dialogue?.pick, text: reco.dialogue?.pick ? `Model: ${reco.dialogue.pick.label}` : 'Ingen stemmemodel er sat op' },
     ] : [];
     const videoGates: Gate[] = [
       ...(s.start_frame_required ? [{ ok: frame.status === 'approved', text: frame.status === 'approved' ? 'Startframen er godkendt' : 'Kræver en godkendt startframe' }] : []),
-      ...(dialogue ? [{ ok: dialogue.status === 'approved', text: dialogue.status === 'approved' ? 'Replikken er godkendt' : 'Kræver en godkendt replik' }] : []),
+      ...(speech && dialogue ? [{ ok: dialogue.status === 'approved', text: dialogue.status === 'approved' ? 'Replikken er godkendt' : 'Kræver en godkendt replik' }] : []),
       ...frameGates.slice(0, 6),
       { ok: !!reco.video.pick, text: reco.video.pick ? `Model: ${reco.video.pick.label}` : `Ingen videomodel kan lave dette shot: ${reco.video.excluded.map((x) => `${x.model.label} ${x.why}`).join('; ')}` },
     ];
     const ok = (g: Gate[]) => g.every((x) => x.ok);
 
     const item = (slot: 'start_frame' | 'video' | 'dialogue', r: Recommendation): PackageItem => ({
-      slot, shotId: s.id, label: `${s.code} · ${slot === 'start_frame' ? 'startframe' : slot === 'dialogue' ? 'replik' : speech ? 'talende video' : 'video'}`,
+      slot, shotId: s.id, label: `${s.code} · ${slot === 'start_frame' ? 'startframe' : slot === 'dialogue' ? (voiceover ? 'voiceover' : 'replik') : speech ? 'talende video' : 'video'}`,
       costCents: Math.max(r.pick?.priceCents ?? 0, r.fallback?.priceCents ?? 0),
       pick: r.pick ? { provider: r.pick.provider, model: r.pick.model, label: r.pick.label } : null,
       fallback: r.fallback ? { provider: r.fallback.provider, model: r.fallback.model } : null,
@@ -253,7 +267,7 @@ export async function planProject(input: PlanInput): Promise<ProjectPlan> {
     }
 
     const speaker = speakerAsset ? { assetId: speakerAsset.id, name: speakerAsset.name, voiceId: speakerAsset.voice_id ?? null, voiceName: speakerAsset.voice_name ?? null } : null;
-    shots.push({ shotId: s.id, code: s.code, frame, video, dialogue, speaker, gates: { frame: frameGates, video: videoGates, dialogue: dialogueGates }, conflicts, stale, prompts, reco });
+    shots.push({ shotId: s.id, code: s.code, frame, video, dialogue, dialogueMode: voiceover ? 'voiceover' : 'on_camera', speaker, gates: { frame: frameGates, video: videoGates, dialogue: dialogueGates }, conflicts, stale, prompts, reco });
   }
 
   for (const a of input.assets) {

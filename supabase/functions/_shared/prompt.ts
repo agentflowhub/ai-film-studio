@@ -3,6 +3,10 @@
 // Prompten bygges KUN af strukturerede data — Film DNA, aktive filmregler,
 // shottets spec og de låste aktiv-versioner — så det samme input altid giver
 // samme prompt og samme hash. Hashen afgør, om et resultat er forældet.
+//
+// Selve prompten er på engelsk, fordi billed- og videomodellerne følger
+// engelske instruktioner mest præcist. Indholdet (handling, attributter,
+// kameraets adfærd) står, som brugeren har skrevet det — på dansk.
 
 export interface PromptAsset {
   code: string;
@@ -18,6 +22,8 @@ export interface PromptShot {
   shot_type: string;
   lens_mm: number | null;
   movement: string;
+  // Hvor kameraet står, og hvordan kameramanden opfører sig i shottet.
+  camera?: string | null;
   action: string;
   notes: string | null;
   performance: string | null;
@@ -64,6 +70,14 @@ export function canonicalJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
+const SHOT_TYPE_EN: Record<string, string> = {
+  extreme_wide: 'extreme wide shot', wide: 'wide shot', medium: 'medium shot', medium_closeup: 'medium close-up',
+  close_up: 'close-up', extreme_close_up: 'extreme close-up', over_the_shoulder: 'over-the-shoulder shot', pov: 'point-of-view shot', insert: 'insert/detail shot',
+};
+const MOVEMENT_EN: Record<string, string> = {
+  static: 'locked-off camera', pan: 'pan', tilt: 'tilt', handheld: 'handheld camera', dolly: 'dolly move', optical_zoom: 'optical zoom',
+};
+
 export function compilePrompt(input: PromptInput): CompiledPrompt {
   const lines: string[] = [];
   const dna = Object.entries(input.dna.fields).map(([k, v]) => `${k.toLowerCase()}: ${v}`).join('; ');
@@ -82,68 +96,79 @@ export function compilePrompt(input: PromptInput): CompiledPrompt {
     return { text: speak.join('\n'), canonical: canonicalOf(speak) };
   }
 
-  lines.push(`Film DNA v${input.dna.version}: ${dna}.`);
-  if (input.rules.length) lines.push(`Undgå: ${input.rules.map((r) => r.toLowerCase()).join('; ')}.`);
   const s = input.shot;
-  lines.push(`Kamera: ${s.shot_type}${s.lens_mm ? `, ${s.lens_mm} mm` : ''}, ${s.movement}, ${s.duration_seconds} sek.`);
+  lines.push(input.slot === 'start_frame'
+    ? 'Create a photorealistic 16:9 still that is the exact opening frame of an observational film shot.'
+    : `Create one continuous ${s.duration_seconds}-second observational film shot.`);
+  lines.push(`Film DNA v${input.dna.version} (look and tone): ${dna}.`);
+  if (input.rules.length) lines.push(`Avoid: ${input.rules.map((r) => r.toLowerCase()).join('; ')}.`);
+  lines.push(`Framing: ${SHOT_TYPE_EN[s.shot_type] ?? s.shot_type}${s.lens_mm ? `, ${s.lens_mm} mm lens` : ''}, ${MOVEMENT_EN[s.movement] ?? s.movement}.`);
+  if (s.camera?.trim()) {
+    lines.push(input.slot === 'start_frame'
+      ? `Camera position (the frame must match where the camera physically stands): ${s.camera.trim()}`
+      : `Camera operator behaviour — one coherent behaviour for the whole shot: ${s.camera.trim()}`);
+  }
   const assets = [...input.assets].sort((a, b) => a.code.localeCompare(b.code));
   for (const a of assets) {
     const attrs = Object.entries(a.attributes)
       .sort(([x], [y]) => x.localeCompare(y))
       .map(([k, v]) => {
         const dev = input.deviations.find((d) => d.assetCode === a.code && d.attribute === k);
-        return `${k.toLowerCase()}: ${dev ? `${dev.value} (bevidst afvigelse)` : v}`;
+        return `${k.toLowerCase()}: ${dev ? `${dev.value} (deliberate deviation)` : v}`;
       })
       .join('; ');
-    lines.push(`${a.kind} ${a.code} v${a.version} — ${a.name}: ${attrs}. [${a.referenceCount} referencebilleder]`);
+    lines.push(`${a.kind} ${a.code} v${a.version} — ${a.name}: ${attrs}. [${a.referenceCount} reference images]`);
   }
-  lines.push(`Handling: ${s.action}`);
-  if (s.performance) lines.push(`Spil: ${s.performance}`);
-  if (s.notes) lines.push(`Noter: ${s.notes}`);
-  if (s.lighting) lines.push(`Lys: ${s.lighting}`);
+  lines.push(`Action: ${s.action}`);
+  if (s.performance) lines.push(`Performance: ${s.performance}`);
+  if (s.notes) lines.push(`Notes: ${s.notes}`);
+  if (s.lighting) lines.push(`Lighting: ${s.lighting}`);
   const ruleDevs = input.deviations.filter((d) => d.ruleText);
-  if (ruleDevs.length) lines.push(`Bevidste undtagelser: ${ruleDevs.map((d) => `"${d.ruleText}" gælder ikke her`).join('; ')}.`);
+  if (ruleDevs.length) lines.push(`Deliberate exceptions: ${ruleDevs.map((d) => `"${d.ruleText}" does not apply here`).join('; ')}.`);
   // Personer: ansigterne skal være de samme som på referencebillederne — og i
   // video de samme hele klippet igennem. Det er det, der skrider først.
   const guide: string[] = [];
   const people = assets.some((a) => a.kind === 'character');
   if (people && input.slot === 'start_frame') {
-    guide.push('Ansigterne skal matche karakterernes referencebilleder nøjagtigt: samme personer, samme alder, ansigtstræk, hår og hudfarve. Naturlige, menneskelige proportioner.');
+    guide.push('Faces must match the character reference images exactly: same people, same age, facial features, hair and skin tone. Natural human proportions, natural skin texture and fabric creases, believable contact between hands and objects.');
   }
   if (people && input.slot === 'video') {
-    guide.push('Personernes ansigter, alder, hår og tøj er uændrede gennem hele klippet — nøjagtig de samme personer som i startframen.');
-    guide.push('Rolige, naturlige bevægelser. Ingen hurtige hovedvendinger; ansigterne forbliver synlige og vender ikke bort fra kameraet.');
+    guide.push("The people's faces, age, hair and clothing stay unchanged for the entire shot — exactly the same people as in the start frame.");
+    guide.push('Calm, natural movement. No sudden head turns; faces stay visible and do not turn away from the camera.');
   }
   if (people) guide.push(PROPS_RULE);
   if (input.slot === 'start_frame' && input.speaker) {
     const n = `${input.speaker.name} (${input.speaker.code})`;
-    guide.push(`Replik-shot: ${n} taler i dette shot. ${n}s ansigt skal ses tydeligt forfra eller i let halvprofil og fylde en tydelig del af billedet, i skarp fokus.`);
-    guide.push(`${n}s mund er lukket og afslappet, og intet dækker munden (ingen hånd, kop, mikrofon eller hår). Andre personer i billedet har lukket mund og ser mod ${input.speaker.name} eller er ude af fokus.`);
+    guide.push(`Dialogue shot: ${n} speaks in this shot. ${n}'s face is clearly visible, frontal or slight three-quarter, a clear part of the frame, in sharp focus.`);
+    guide.push(`${n}'s mouth is closed and relaxed and nothing covers it (no hand, cup, microphone or hair). Other people in frame have closed mouths and look toward ${input.speaker.name} or are out of focus.`);
   }
-  if (input.slot === 'video') lines.push('Start fra den vedlagte, godkendte startframe og bevar komposition, karakterer og lys.');
+  if (input.slot === 'video') lines.push('Start from the attached, approved start frame and preserve its composition, characters and lighting.');
   // Replikkens ord står ALDRIG i en videoprompt: videomodellen skriver dem så
   // ind i billedet som (forvrængede) undertekster. Munden styres af lyden.
-  if (input.slot === 'video' && input.speech) guide.push('Personen taler dansk; munden følger den vedlagte lyd.', NO_TEXT);
+  if (input.slot === 'video' && input.speech) guide.push('The person speaks Danish; the mouth follows the attached audio.');
+  guide.push(NO_TEXT);
 
   return { text: [...lines, ...guide].join('\n'), canonical: canonicalOf(guide) };
 }
 
 // Genstande i hænderne: modellerne ved ikke af sig selv, hvilken vej en
 // telefon vender, og lader den gerne vise skærmen ud mod kameraet.
-export const PROPS_RULE = 'Telefoner, skærme, bøger og papirer vender med forsiden mod den, der bruger dem — medmindre handlingen siger, at de vises frem. '
-  + 'Skriver en person på en telefon, holdes den i personens egne hænder med skærmen mod personen, og tommelfingrene rører skærmen; skal skærmen ses, filmes den skråt over personens skulder. '
-  + 'Én telefon pr. person og ingen løse hænder eller genstande i billedkanten, der ikke hører til en person i billedet.';
+export const PROPS_RULE = 'Phones, screens, books and papers face the person using them, unless the action says they are being shown to someone. '
+  + "When someone types on a phone, it is held in that person's own hands with the screen toward them and the thumbs on the screen; if the screen must be seen, film it over the person's shoulder. "
+  + 'One phone per person, and no stray hands or objects at the frame edge that do not belong to someone in the shot.';
 
-// Videomodeller skriver gerne tekst fra prompten ind i billedet.
-export const NO_TEXT = 'Ingen undertekster, billedtekster, titler eller anden påført tekst i billedet.';
+// Billed- og videomodeller skriver gerne tekst fra prompten ind i billedet.
+// Undertekster, titler og slogan lægges på, når filmen samles.
+export const NO_TEXT = 'No subtitles, captions, titles, watermarks or other overlaid text in the image.';
 
 function speakPrompt(input: PromptInput, speaker: { code: string; name: string }): string[] {
   const s = input.shot;
   return [
-    `${speaker.name} taler dansk — lyden er vedlagt.`,
-    `Læbebevægelserne følger den vedlagte lyd præcist, stavelse for stavelse. Kun ${speaker.name}s mund bevæger sig; andre i billedet taler ikke.`,
-    `Små, naturlige hoved- og øjenbevægelser, rolig krop, ingen kamerabevægelse.${s.performance ? ` Spil: ${s.performance}.` : ''}`,
-    'Bevar startframens komposition, lys, tøj og ansigter uændret.',
+    `One continuous shot. ${speaker.name} speaks Danish — the audio is attached; match its words, pauses, breath and delivery.`,
+    `Lip movements follow the attached audio precisely, syllable by syllable. Only ${speaker.name}'s mouth moves; nobody else in frame speaks.`,
+    `Natural blinks, breathing and small head and posture adjustments; let ${speaker.name} settle after the final word.${s.performance ? ` Performance: ${s.performance}.` : ''}`,
+    s.camera?.trim() ? `Camera operator behaviour: ${s.camera.trim()}` : 'The camera holds steady.',
+    'Preserve the start frame composition, lighting, clothing and faces unchanged.',
     PROPS_RULE,
     NO_TEXT,
   ];

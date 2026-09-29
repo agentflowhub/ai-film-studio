@@ -50,9 +50,9 @@ export async function loadPlanInput(
   if (storyboardId) {
     const shots = await admin
       .from('shots')
-      .select(`id, code, duration_seconds, shot_type, lens_mm, movement, action, notes, performance, lighting,
+      .select(`id, code, duration_seconds, shot_type, lens_mm, movement, camera, action, notes, performance, lighting,
         start_frame_required, video_required, approved_start_frame_id, approved_video_id,
-        dialogue, speaker_asset_id, approved_dialogue_id,
+        dialogue, speaker_asset_id, approved_dialogue_id, dialogue_mode,
         shot_assets(asset_id, asset_version_id, pinned),
         shot_deviations(kind, asset_id, attribute, rule_id, shot_value),
         generations!generations_shot_id_fkey(id, slot, version, status, review, input_hash)`)
@@ -93,6 +93,7 @@ export async function loadPlanInput(
     shot_type: s.shot_type as string,
     lens_mm: (s.lens_mm as number | null) ?? null,
     movement: s.movement as string,
+    camera: (s.camera as string | null) ?? null,
     action: s.action as string,
     notes: (s.notes as string | null) ?? null,
     performance: (s.performance as string | null) ?? null,
@@ -104,6 +105,7 @@ export async function loadPlanInput(
     dialogue: (s.dialogue as string | null) ?? null,
     speaker_asset_id: (s.speaker_asset_id as string | null) ?? null,
     approved_dialogue_id: (s.approved_dialogue_id as string | null) ?? null,
+    dialogue_mode: s.dialogue_mode === 'voiceover' ? 'voiceover' : 'on_camera',
     links: ((s.shot_assets as Raw[]) ?? []).map((l) => ({ asset_id: l.asset_id as string, asset_version_id: l.asset_version_id as string, pinned: l.pinned as boolean })),
     deviations: ((s.shot_deviations as Raw[]) ?? []).map((d) => ({
       kind: d.kind as 'attribute' | 'rule',

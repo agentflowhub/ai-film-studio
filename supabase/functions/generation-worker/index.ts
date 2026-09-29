@@ -67,7 +67,7 @@ async function buildRequest(admin: Admin, g: Gen): Promise<GenerationRequest> {
   }
   const shot = await admin
     .from('shots')
-    .select('duration_seconds, approved_start_frame_id, approved_dialogue_id, shot_assets(assets(kind, name, code), asset_versions(asset_references(is_primary, media(storage_path))))')
+    .select('duration_seconds, approved_start_frame_id, approved_dialogue_id, dialogue_mode, shot_assets(assets(kind, name, code), asset_versions(asset_references(is_primary, media(storage_path))))')
     .eq('id', g.shot_id!)
     .single();
   if (shot.error) throw shot.error;
@@ -84,8 +84,9 @@ async function buildRequest(admin: Admin, g: Gen): Promise<GenerationRequest> {
     const frame = await admin.from('generations').select('media:output_media_id(storage_path)').eq('id', shot.data.approved_start_frame_id as string).single();
     if (frame.error) throw frame.error;
     [req.startFrameUrl] = await signedUrls(admin, [(frame.data.media as unknown as { storage_path: string }).storage_path]);
-    // Talende video: munden skal følge den godkendte replik.
-    if (shot.data.approved_dialogue_id) {
+    // Talende video: munden skal følge den godkendte replik. En voiceover
+    // lægges først på, når filmen samles — videoen laves uden lyden.
+    if (shot.data.approved_dialogue_id && shot.data.dialogue_mode !== 'voiceover') {
       const line = await admin.from('generations').select('media:output_media_id(storage_path)').eq('id', shot.data.approved_dialogue_id as string).single();
       if (line.error) throw line.error;
       [req.audioUrl] = await signedUrls(admin, [(line.data.media as unknown as { storage_path: string }).storage_path]);

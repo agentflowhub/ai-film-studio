@@ -94,9 +94,9 @@ describe('prompt-compiler', () => {
 
   it('bygger prompten af Film DNA, regler, spec og låste aktiv-versioner', () => {
     const { text } = compilePrompt(base);
-    expect(text).toContain('Film DNA v1:');
-    expect(text).toContain('Undgå: ingen droneoptagelser; intet skønhedslys.');
-    expect(text).toContain('character CHAR_X_01 v2 — Person: hovedbeklædning: flat cap. [4 referencebilleder]');
+    expect(text).toContain('Film DNA v1 (look and tone):');
+    expect(text).toContain('Avoid: ingen droneoptagelser; intet skønhedslys.');
+    expect(text).toContain('character CHAR_X_01 v2 — Person: hovedbeklædning: flat cap. [4 reference images]');
   });
 
   it('giver samme hash uanset rækkefølge af aktiver og regler', async () => {
@@ -113,25 +113,25 @@ describe('prompt-compiler', () => {
 
   it('markerer en bevidst afvigelse i prompten', () => {
     const { text } = compilePrompt({ ...base, deviations: [{ assetCode: 'CHAR_X_01', attribute: 'Hovedbeklædning', value: 'blå kasket' }] });
-    expect(text).toContain('hovedbeklædning: blå kasket (bevidst afvigelse)');
+    expect(text).toContain('hovedbeklædning: blå kasket (deliberate deviation)');
   });
 
   it('et replik-shot beder startframen om talerens tydelige ansigt og lukkede mund', () => {
     const { text } = compilePrompt({ ...base, speaker: { code: 'CHAR_X_01', name: 'Person' } });
-    expect(text).toContain('Person (CHAR_X_01) taler i dette shot');
-    expect(text).toContain('mund er lukket og afslappet');
-    expect(compilePrompt(base).text).not.toContain('Replik-shot');
+    expect(text).toContain('Person (CHAR_X_01) speaks in this shot');
+    expect(text).toContain('mouth is closed and relaxed');
+    expect(compilePrompt(base).text).not.toContain('Dialogue shot');
   });
 
   it('en talende video får en kort Speak-prompt, men hashen følger hele inputtet', async () => {
     const talk = { ...base, slot: 'video' as const, startFrameId: 'f1', speech: { line: 'Den er klaret i dag.', audioId: 'a1' }, speaker: { code: 'CHAR_X_01', name: 'Person' } };
     const { text, canonical } = compilePrompt(talk);
-    expect(text).toContain('Person taler dansk — lyden er vedlagt.');
+    expect(text).toContain('Person speaks Danish — the audio is attached');
     // Replikkens ord må aldrig stå i en videoprompt — så tegnes de som undertekster.
     expect(text).not.toContain('Den er klaret i dag.');
-    expect(text).toContain('Ingen undertekster');
-    expect(text).toContain('Kun Persons mund bevæger sig');
-    expect(text).toContain('Spil: Underspillet.');
+    expect(text).toContain('No subtitles');
+    expect(text).toContain("Only Person's mouth moves");
+    expect(text).toContain('Performance: Underspillet.');
     expect(text).not.toContain('Film DNA');
     const changed = compilePrompt({ ...talk, rules: ['Ny regel'] });
     expect(await sha256Hex(changed.canonical)).not.toBe(await sha256Hex(canonical));

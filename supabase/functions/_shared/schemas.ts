@@ -238,6 +238,8 @@ export const ShotUpdateRequestSchema = z.object({
     performance: z.string().trim().max(80).nullable(),
     lighting: z.string().trim().max(200).nullable(),
     speaker_asset_id: z.uuid().nullable(),
+    camera: z.string().trim().min(1).max(300),
+    dialogue_mode: z.enum(DIALOGUE_MODES),
   }).partial(),
 });
 

@@ -64,14 +64,14 @@ describe('planen for et shot med replik', () => {
   it('startframen viser talerens ansigt, og Speak får kun det, der styrer munden', async () => {
     const s = (await planProject(input({ approvedDialogue: 'd1' }))).shots[0]!;
     expect(s.prompts.start_frame.text).toContain('Viceværten');
-    expect(s.prompts.start_frame.text).toContain('mund er lukket og afslappet');
-    expect(s.prompts.video.text).toContain('Kun Viceværtens mund bevæger sig');
+    expect(s.prompts.start_frame.text).toContain('mouth is closed and relaxed');
+    expect(s.prompts.video.text).toContain("Only Viceværten's mouth moves");
     expect(s.prompts.video.text).not.toContain('Film DNA');
   });
 
   it('et shot uden replik får ingen replik-instruktion i startframen', async () => {
     const s = (await planProject(input({ dialogue: null }))).shots[0]!;
-    expect(s.prompts.start_frame.text).not.toContain('Replik-shot');
+    expect(s.prompts.start_frame.text).not.toContain('Dialogue shot');
   });
 
   it('en ny replik-lyd gør videoen forældet', async () => {
@@ -185,5 +185,50 @@ describe('registry', () => {
     const r = createRegistry((k) => ({ ELEVENLABS_API_KEY: 'xi', HIGGSFIELD_CREDENTIALS: 'keyid:secret' })[k]);
     expect(r.adapter('elevenlabs')).not.toBeNull();
     expect(r.models.map((m) => `${m.provider}/${m.model}`)).toEqual(expect.arrayContaining(['elevenlabs/eleven_v3', 'higgsfield/speak']));
+  });
+});
+
+describe('voiceover: stemmen over et dækbillede', () => {
+  // Shottet viser kun opgangen; Viceværten høres, men ses ikke.
+  function vo(): PlanInput {
+    const i = input();
+    const s = i.shots[0]!;
+    i.shots[0] = { ...s, dialogue_mode: 'voiceover', speaker_asset_id: 'c1', action: 'Opgangen ligger stille.', links: [{ asset_id: 'l1', asset_version_id: 'l1v1', pinned: false }] };
+    return i;
+  }
+
+  it('taleren må være uden for shottet, og replikken laves som voiceover', async () => {
+    const plan = await planProject(vo());
+    const s = plan.shots[0]!;
+    expect(s.dialogueMode).toBe('voiceover');
+    expect(s.speaker).toMatchObject({ name: 'Viceværten' });
+    expect(plan.packages.lines.map((l) => l.label)).toEqual(['SHOT_01 · voiceover']);
+  });
+
+  it('videoen venter ikke på replikken og laves uden læbesynk', async () => {
+    const s = (await planProject(vo())).shots[0]!;
+    expect(s.gates.video.map((g) => g.text)).not.toContain('Kræver en godkendt replik');
+    expect(s.reco.video.pick?.capabilities).not.toContain('speech_to_video');
+    expect(s.prompts.start_frame.text).not.toContain('Dialogue shot');
+  });
+
+  it('taleren skal have samtykke, selv om den ikke er i billedet', async () => {
+    const i = vo();
+    i.assets[0] = { ...i.assets[0]!, consent_status: 'missing' };
+    const s = (await planProject(i)).shots[0]!;
+    expect(s.gates.dialogue).toContainEqual({ ok: false, text: 'Samtykke mangler: Viceværten' });
+  });
+});
+
+describe('kameraets adfærd', () => {
+  it('kommer med i både startframe og video, og en ændring gør dem forældede', async () => {
+    const a = input({ approvedDialogue: 'd1' });
+    a.shots[0] = { ...a.shots[0]!, camera: 'Kameraet står i døråbningen og zoomer hurtigt ind.' };
+    const pa = (await planProject(a)).shots[0]!;
+    expect(pa.prompts.start_frame.text).toContain('Camera position');
+    expect(pa.prompts.video.text).toContain('Kameraet står i døråbningen');
+    const b = input({ approvedDialogue: 'd1' });
+    b.shots[0] = { ...b.shots[0]!, camera: 'Håndholdt fra gangen.' };
+    expect((await planProject(b)).shots[0]!.prompts.start_frame.hash).not.toBe(pa.prompts.start_frame.hash);
   });
 });

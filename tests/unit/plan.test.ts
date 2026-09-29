@@ -125,7 +125,7 @@ describe('produktionsplan på Golden Test Case', () => {
   it('bygger prompten ud fra Film DNA, regler og låste aktiv-versioner', () => {
     const p = shot('SHOT_02').prompts.start_frame.text;
     expect(p).toContain('Film DNA v1');
-    expect(p).toContain('Undgå: ingen droneoptagelser');
+    expect(p).toContain('Avoid: ingen droneoptagelser');
     expect(p).toContain('CHAR_SANDER_01 v1 — Sander');
     expect(p).toContain('mørkegrå flat cap');
   });
@@ -135,7 +135,7 @@ describe('produktionsplan på Golden Test Case', () => {
     i2.shots.find((s) => s.code === 'SHOT_07')!.deviations = [{ kind: 'attribute', assetId: 'a_sander', attribute: 'Hovedbeklædning', shot_value: 'blå baseballkasket' }];
     const p2 = await planProject(i2);
     expect(p2.blocked.find((b) => b.code === 'SHOT_07')).toBeUndefined();
-    expect(p2.shots.find((s) => s.code === 'SHOT_07')!.prompts.start_frame.text).toContain('blå baseballkasket (bevidst afvigelse)');
+    expect(p2.shots.find((s) => s.code === 'SHOT_07')!.prompts.start_frame.text).toContain('blå baseballkasket (deliberate deviation)');
   });
 
   it('kræver godkendt storyboard og Film DNA', async () => {

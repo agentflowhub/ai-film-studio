@@ -54,22 +54,22 @@ describe('prompten om ansigter og genstande', () => {
 
   it('startframen kræver ansigter som på referencerne og rigtigt vendte telefoner', () => {
     const { text } = compilePrompt(base);
-    expect(text).toContain('Ansigterne skal matche karakterernes referencebilleder nøjagtigt');
+    expect(text).toContain('Faces must match the character reference images exactly');
     expect(text).toContain(PROPS_RULE);
   });
 
   it('videoen holder ansigterne ens hele klippet og undgår hurtige hovedvendinger', () => {
     const { text } = compilePrompt({ ...base, slot: 'video', startFrameId: 'f1' });
-    expect(text).toContain('uændrede gennem hele klippet');
-    expect(text).toContain('Ingen hurtige hovedvendinger');
+    expect(text).toContain('stay unchanged for the entire shot');
+    expect(text).toContain('No sudden head turns');
     expect(text).toContain(PROPS_RULE);
   });
 
   it('shots uden personer får ingen af reglerne (og bliver ikke forældede)', () => {
     const { text, canonical } = compilePrompt({ ...base, assets: [{ code: 'LOC_01', kind: 'location', name: 'Køkken', version: 1, attributes: {}, referenceCount: 2 }] });
-    expect(text).not.toContain('Ansigterne');
+    expect(text).not.toContain('Faces must match');
     expect(text).not.toContain(PROPS_RULE);
-    expect(canonical).not.toContain('guidance');
+    expect(canonical).not.toContain(PROPS_RULE);
   });
 
   it('instruktionerne indgår i hashen, så nye regler gør gamle resultater forældede', () => {
@@ -79,6 +79,6 @@ describe('prompten om ansigter og genstande', () => {
       expect(canonical).toContain(PROPS_RULE);
     }
     const talk = compilePrompt({ ...base, slot: 'video', speech: { line: 'Hej', audioId: 'a' }, speaker: { code: 'CHAR_02', name: 'Lone' } });
-    expect(talk.canonical).toContain('Ingen undertekster');
+    expect(talk.canonical).toContain('No subtitles');
   });
 });
