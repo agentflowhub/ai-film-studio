@@ -11,4 +11,6 @@ export default defineConfig({
       transformIndexHtml: (html) => html.replaceAll('%PRODUCT_NAME%', product.name),
     },
   ],
+  // ffmpeg.wasm starter sin egen worker og må ikke forhåndspakkes af Vite.
+  optimizeDeps: { exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util'] },
 });
