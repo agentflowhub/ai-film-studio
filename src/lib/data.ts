@@ -48,7 +48,7 @@ export async function loadFilm(filmId: string): Promise<FilmData> {
     supabase.from('film_dna').select('id, task_id, version, status, fields').eq('project_id', filmId).order('version', { ascending: false }).limit(1),
     supabase.from('film_rules').select('id, text, pattern, reason, enabled').eq('project_id', filmId).order('created_at'),
     supabase.from('storyboards').select('id, task_id, version, status, total_seconds').eq('project_id', filmId).order('version', { ascending: false }),
-    supabase.from('assets').select('id, code, kind, name, role, consent_status, master_version_id, asset_versions(id, version, status, attributes, note, asset_references(role, is_primary, media(storage_path)))').eq('project_id', filmId).order('code'),
+    supabase.from('assets').select('id, code, kind, name, role, consent_status, master_version_id, asset_versions!asset_versions_asset_id_fkey(id, version, status, attributes, note, asset_references(role, is_primary, media(storage_path)))').eq('project_id', filmId).order('code'),
     supabase.from('generations').select('id, slot, shot_id, asset_version_id, version, status, review, cost_estimate_cents, cost_actual_cents, created_at, media:output_media_id(storage_path, mime), generation_attempts(attempt, provider, model, status, error, stop_confirmed, started_at, finished_at)').eq('project_id', filmId).order('created_at', { ascending: false }).limit(300),
     supabase.from('tasks').select('type, status, error, updated_at').eq('project_id', filmId).order('created_at', { ascending: false }).limit(20),
   ]);

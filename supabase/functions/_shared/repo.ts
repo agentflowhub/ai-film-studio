@@ -40,7 +40,7 @@ export async function loadPlanInput(
     admin.from('film_rules').select('id, text, pattern, reason, enabled').eq('project_id', project.id).order('created_at'),
     admin
       .from('assets')
-      .select('id, code, kind, name, consent_status, master_version_id, asset_versions(id, version, status, attributes, continuity_rules, note, asset_references(count))')
+      .select('id, code, kind, name, consent_status, master_version_id, asset_versions!asset_versions_asset_id_fkey(id, version, status, attributes, continuity_rules, note, asset_references(count))')
       .eq('project_id', project.id),
   ]);
   for (const r of [dna, rules, assets]) if (r.error) throw r.error;

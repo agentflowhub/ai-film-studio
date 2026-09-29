@@ -128,7 +128,7 @@ serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, us
       // nyt storyboard efter en afvisning); ellers opret et nyt som kladde.
       const existing = await admin
         .from('assets')
-        .select('id, code, kind, name, asset_versions(id, version)')
+        .select('id, code, kind, name, asset_versions!asset_versions_asset_id_fkey(id, version)')
         .eq('project_id', projectId);
       if (existing.error) throw step('aktiver (læs)', existing.error);
       const rows = toAssetRows(fitted.draft.assets, new Set(existing.data.map((a) => a.code as string)));
