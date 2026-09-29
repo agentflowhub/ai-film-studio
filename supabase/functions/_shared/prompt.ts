@@ -43,6 +43,10 @@ export interface PromptInput {
   // For en talende video: replikken og den godkendte lyd, munden skal følge.
   // Skiftes lyden, er videoen forældet. Udelades for stumme shots.
   speech?: { line: string; audioId: string | null };
+  // Karakteren, der siger shottets replik — sat for både startframe og video,
+  // når shottet taler. Speak animerer det ansigt, startframen viser, så
+  // startframen skal vise netop talerens ansigt tydeligt.
+  speaker?: { code: string; name: string };
 }
 
 export interface CompiledPrompt {
@@ -63,6 +67,13 @@ export function canonicalJson(value: unknown): string {
 export function compilePrompt(input: PromptInput): CompiledPrompt {
   const lines: string[] = [];
   const dna = Object.entries(input.dna.fields).map(([k, v]) => `${k.toLowerCase()}: ${v}`).join('; ');
+  const canonical = canonicalJson({ ...input, assets: [...input.assets].sort((a, b) => a.code.localeCompare(b.code)), rules: [...input.rules].sort() });
+
+  // Talende video: Speak skal kun vide, hvem der taler og hvordan. Resten
+  // (komposition, lys, karakterer) ligger allerede i startframen. Hashen
+  // bygger stadig på hele inputtet, så en ændring i fx DNA gør videoen forældet.
+  if (input.slot === 'video' && input.speech && input.speaker) return { text: speakPrompt(input, input.speaker, input.speech.line), canonical };
+
   lines.push(`Film DNA v${input.dna.version}: ${dna}.`);
   if (input.rules.length) lines.push(`Undgå: ${input.rules.map((r) => r.toLowerCase()).join('; ')}.`);
   const s = input.shot;
@@ -84,10 +95,25 @@ export function compilePrompt(input: PromptInput): CompiledPrompt {
   if (s.lighting) lines.push(`Lys: ${s.lighting}`);
   const ruleDevs = input.deviations.filter((d) => d.ruleText);
   if (ruleDevs.length) lines.push(`Bevidste undtagelser: ${ruleDevs.map((d) => `"${d.ruleText}" gælder ikke her`).join('; ')}.`);
+  if (input.slot === 'start_frame' && input.speaker) {
+    const n = `${input.speaker.name} (${input.speaker.code})`;
+    lines.push(`Replik-shot: ${n} taler i dette shot. ${n}s ansigt skal ses tydeligt forfra eller i let halvprofil og fylde en tydelig del af billedet, i skarp fokus.`);
+    lines.push(`${n}s mund er lukket og afslappet, og intet dækker munden (ingen hånd, kop, mikrofon eller hår). Andre personer i billedet har lukket mund og ser mod ${input.speaker.name} eller er ude af fokus.`);
+  }
   if (input.slot === 'video') lines.push('Start fra den vedlagte, godkendte startframe og bevar komposition, karakterer og lys.');
   if (input.slot === 'video' && input.speech) lines.push(`Replik på dansk — munden følger den vedlagte lyd: "${input.speech.line}"`);
 
-  return { text: lines.join('\n'), canonical: canonicalJson({ ...input, assets, rules: [...input.rules].sort() }) };
+  return { text: lines.join('\n'), canonical };
+}
+
+function speakPrompt(input: PromptInput, speaker: { code: string; name: string }, line: string): string {
+  const s = input.shot;
+  return [
+    `${speaker.name} siger replikken på dansk: "${line}"`,
+    `Læbebevægelserne følger den vedlagte lyd præcist, stavelse for stavelse. Kun ${speaker.name}s mund bevæger sig; andre i billedet taler ikke.`,
+    `Små, naturlige hoved- og øjenbevægelser, rolig krop, ingen kamerabevægelse.${s.performance ? ` Spil: ${s.performance}.` : ''}`,
+    'Bevar startframens komposition, lys, tøj og ansigter uændret.',
+  ].join('\n');
 }
 
 export async function sha256Hex(text: string): Promise<string> {

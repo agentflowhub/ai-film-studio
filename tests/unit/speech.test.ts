@@ -61,6 +61,19 @@ describe('planen for et shot med replik', () => {
     expect(s.prompts.video.text).toContain('Den er klaret i dag.');
   });
 
+  it('startframen viser talerens ansigt, og Speak får kun det, der styrer munden', async () => {
+    const s = (await planProject(input({ approvedDialogue: 'd1' }))).shots[0]!;
+    expect(s.prompts.start_frame.text).toContain('Viceværten');
+    expect(s.prompts.start_frame.text).toContain('mund er lukket og afslappet');
+    expect(s.prompts.video.text).toContain('Kun Viceværtens mund bevæger sig');
+    expect(s.prompts.video.text).not.toContain('Film DNA');
+  });
+
+  it('et shot uden replik får ingen replik-instruktion i startframen', async () => {
+    const s = (await planProject(input({ dialogue: null }))).shots[0]!;
+    expect(s.prompts.start_frame.text).not.toContain('Replik-shot');
+  });
+
   it('en ny replik-lyd gør videoen forældet', async () => {
     const a = await planProject(input({ approvedDialogue: 'd1' }));
     const b = await planProject(input({ approvedDialogue: 'd2' }));

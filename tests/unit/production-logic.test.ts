@@ -116,6 +116,28 @@ describe('prompt-compiler', () => {
     expect(text).toContain('hovedbeklædning: blå kasket (bevidst afvigelse)');
   });
 
+  it('et replik-shot beder startframen om talerens tydelige ansigt og lukkede mund', () => {
+    const { text } = compilePrompt({ ...base, speaker: { code: 'CHAR_X_01', name: 'Person' } });
+    expect(text).toContain('Person (CHAR_X_01) taler i dette shot');
+    expect(text).toContain('mund er lukket og afslappet');
+    expect(compilePrompt(base).text).not.toContain('Replik-shot');
+  });
+
+  it('en talende video får en kort Speak-prompt, men hashen følger hele inputtet', async () => {
+    const talk = { ...base, slot: 'video' as const, startFrameId: 'f1', speech: { line: 'Den er klaret i dag.', audioId: 'a1' }, speaker: { code: 'CHAR_X_01', name: 'Person' } };
+    const { text, canonical } = compilePrompt(talk);
+    expect(text).toContain('Person siger replikken på dansk: "Den er klaret i dag."');
+    expect(text).toContain('Kun Persons mund bevæger sig');
+    expect(text).toContain('Spil: Underspillet.');
+    expect(text).not.toContain('Film DNA');
+    const changed = compilePrompt({ ...talk, rules: ['Ny regel'] });
+    expect(await sha256Hex(changed.canonical)).not.toBe(await sha256Hex(canonical));
+  });
+
+  it('stumme shots får samme hash som før (intet bliver forældet uden grund)', () => {
+    expect(compilePrompt(base).canonical).not.toContain('speaker');
+  });
+
   it('sorterer nøgler i kanonisk JSON', () => {
     expect(canonicalJson({ b: 1, a: { d: 2, c: 3 } })).toBe('{"a":{"c":3,"d":2},"b":1}');
   });

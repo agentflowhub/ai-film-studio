@@ -182,6 +182,7 @@ export async function planProject(input: PlanInput): Promise<ProjectPlan> {
         deviations,
         startFrameId: slot === 'video' ? s.approved_start_frame_id : undefined,
         speech: slot === 'video' && speech ? { line: line!, audioId: s.approved_dialogue_id ?? null } : undefined,
+        speaker: speech ? { code: speakerAsset!.code, name: speakerAsset!.name } : undefined,
       });
       return { ...compiled, hash: await sha256Hex(compiled.canonical) };
     };
