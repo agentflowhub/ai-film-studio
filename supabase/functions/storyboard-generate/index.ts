@@ -11,7 +11,7 @@
 import { generateStructured, GenerateError } from '../_shared/claude.ts';
 import { claimTask, isOrgMember, markTaskFailed, nextVersion, recordUsage } from '../_shared/db.ts';
 import { apiError, errorText, json, log } from '../_shared/http.ts';
-import { modelFor } from '../_shared/model-config.ts';
+import { budgetedTimeout, modelFor } from '../_shared/model-config.ts';
 import { canGenerateStoryboard, storyboardStageAllowed } from '../_shared/policy.ts';
 import { STORYBOARD_SYSTEM_PROMPT, storyboardUserMessage } from '../_shared/prompts.ts';
 import { serve } from '../_shared/runtime.ts';
@@ -20,6 +20,7 @@ import { BriefAnswersSchema, FilmBriefSchema, StoryboardDraftSchema, StoryboardG
 import { fitToDuration, flattenShots } from '../_shared/storyboard.ts';
 
 serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, userId, body, env, anthropic }) => {
+  const startedAt = Date.now();
   const brief = await admin
     .from('film_briefs')
     .select('id, org_id, project_id, task_id, status, content, answers, projects!inner(stage)')
@@ -92,7 +93,7 @@ serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, us
 
   try {
     const generated = await generateStructured(anthropic().beta.messages, {
-      config,
+      config: { ...config, timeoutMs: budgetedTimeout(config, startedAt, env) },
       system: STORYBOARD_SYSTEM_PROMPT,
       user: storyboardUserMessage(filmBrief, dna ?? null, filmBrief.duration_seconds, shotCount, existingAssets),
       schema: StoryboardDraftSchema,

@@ -96,3 +96,22 @@ describe('tidsgrænse for Claude-kald', () => {
     expect(STALE_EXECUTING_MS).toBeGreaterThan(400_000);
   });
 });
+
+describe('storyboardet og Supabases tidsgrænse', () => {
+  it('på gratis-planen tænker Claude kortere over storyboardet; med længere tid som før', async () => {
+    const { modelFor } = await import('../../supabase/functions/_shared/model-config.ts');
+    expect(modelFor('storyboard.generate').effort).toBe('low');
+    expect(modelFor('storyboard.generate', (k) => (k === 'FILM_CLAUDE_TIMEOUT_MS' ? '380000' : undefined)).effort).toBe('medium');
+    expect(modelFor('brief.generate').effort).toBe('high');
+  });
+
+  it('Claude-kaldet efterlader altid tid til at gemme, før funktionen stoppes', async () => {
+    const { budgetedTimeout, modelFor, FREE_WALL_MS, SAVE_RESERVE_MS } = await import('../../supabase/functions/_shared/model-config.ts');
+    const c = modelFor('storyboard.generate');
+    expect(budgetedTimeout(c, 0, () => undefined, 0)).toBe(FREE_WALL_MS - SAVE_RESERVE_MS);
+    // 20 sek. brugt på forberedelse: Claude får tilsvarende mindre.
+    expect(budgetedTimeout(c, 0, () => undefined, 20_000)).toBe(FREE_WALL_MS - SAVE_RESERVE_MS - 20_000);
+    const paid = (k: string) => (k === 'FILM_CLAUDE_TIMEOUT_MS' ? '380000' : undefined);
+    expect(budgetedTimeout(modelFor('storyboard.generate', paid), 0, paid, 5_000)).toBe(370_000);
+  });
+});
