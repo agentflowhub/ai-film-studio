@@ -1,0 +1,84 @@
+// ElevenLabs som stemmeprovider: dansk tale ud fra replikken og karakterens
+// faste stemme.
+//
+// API: POST https://api.elevenlabs.io/v1/text-to-speech/{voice_id}
+//      ?output_format=wav_24000, header xi-api-key, body { text, model_id,
+//      language_code }. Svaret er selve lydfilen — en replik tager sekunder,
+//      så kaldet køres med det samme (run) i stedet for som et job, der følges.
+// Stemmer: GET /v1/voices.
+
+import type { ProviderSettings } from './catalog.ts';
+import { ELEVENLABS_MODELS } from './catalog.ts';
+import { ProviderRejectedError, type ModelInfo, type ProviderAdapter } from './types.ts';
+
+const BASE = 'https://api.elevenlabs.io';
+
+export interface Voice {
+  voice_id: string;
+  name: string;
+  preview_url: string | null;
+  description: string;
+}
+
+export function createElevenLabs(apiKey: string, settings: ProviderSettings['elevenlabs'], models: ModelInfo[] = ELEVENLABS_MODELS, fetchFn: typeof fetch = fetch): ProviderAdapter {
+  return {
+    id: 'elevenlabs',
+    models: () => models,
+
+    async run(model, req) {
+      if (!req.voiceId) throw new ProviderRejectedError('replikken har ingen stemme', 400);
+      const text = req.prompt.trim();
+      if (!text) throw new ProviderRejectedError('replikken er tom', 400);
+      const url = `${BASE}/v1/text-to-speech/${encodeURIComponent(req.voiceId)}?output_format=${encodeURIComponent(settings.outputFormat)}`;
+      const res = await fetchFn(url, {
+        method: 'POST',
+        headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json', Accept: 'audio/wav' },
+        // language_code sikrer dansk udtale; modeller, der ikke understøtter den, ignorerer den.
+        body: JSON.stringify({ text, model_id: model, language_code: settings.languageCode }),
+      });
+      if (!res.ok) {
+        const reason = await reasonOf(res);
+        if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 409 && res.status !== 429) {
+          throw new ProviderRejectedError(`ElevenLabs afviste kaldet (${res.status})${reason}`, res.status);
+        }
+        throw new Error(`ElevenLabs svarede ${res.status}${reason}`);
+      }
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      if (bytes.byteLength < 44) throw new Error('ElevenLabs returnerede ingen lyd');
+      return { bytes, mime: 'audio/wav' };
+    },
+
+    // Bruges ikke: tale laves med run(). Findes for at opfylde interfacet.
+    async submit() {
+      throw new ProviderRejectedError('ElevenLabs kører synkront', 400);
+    },
+    async status() {
+      return { state: 'failed', retryable: false, reason: 'ElevenLabs har ingen jobs' };
+    },
+    async cancel() {
+      return true;
+    },
+  };
+}
+
+export async function listVoices(apiKey: string, fetchFn: typeof fetch = fetch): Promise<Voice[]> {
+  const res = await fetchFn(`${BASE}/v1/voices`, { headers: { 'xi-api-key': apiKey } });
+  if (!res.ok) throw new Error(`ElevenLabs svarede ${res.status}${await reasonOf(res)}`);
+  const body = (await res.json()) as { voices?: { voice_id: string; name: string; preview_url?: string | null; labels?: Record<string, string>; description?: string | null }[] };
+  return (body.voices ?? []).map((v) => ({
+    voice_id: v.voice_id,
+    name: v.name,
+    preview_url: v.preview_url ?? null,
+    description: [v.labels?.gender, v.labels?.age, v.labels?.accent, v.labels?.description ?? v.description].filter(Boolean).join(' · '),
+  }));
+}
+
+async function reasonOf(res: Response): Promise<string> {
+  try {
+    const body = (await res.json()) as { detail?: { message?: string } | string };
+    const msg = typeof body.detail === 'string' ? body.detail : body.detail?.message;
+    return msg ? `: ${String(msg).slice(0, 200)}` : '';
+  } catch {
+    return '';
+  }
+}

@@ -38,6 +38,7 @@ export const api = {
   shotUpdate: (shotId: string, changes: Record<string, unknown>) => call<{ spec_version: number }>('shot-update', { shot_id: shotId, changes }),
   continuity: (body: Record<string, unknown>) => call<{ message?: string }>('shot-continuity', body),
   plan: (projectId: string) => call<PlanResponse>('production-plan', { project_id: projectId }),
+  voices: (projectId: string) => call<{ configured: boolean; voices: { voice_id: string; name: string; preview_url: string | null; description: string }[] }>('voices-list', { project_id: projectId }),
   start: (projectId: string, key: string, items: ProductionItem[], expectedTotal: number) =>
     call<{ batch_task_id: string; total_cents: number }>('production-start', { project_id: projectId, idempotency_key: key, items, expected_total_cents: expectedTotal }),
   review: (generationId: string, decision: 'approved' | 'rejected', comment?: string) =>

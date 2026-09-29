@@ -65,6 +65,7 @@ function Control({ d }: { d: FilmData }) {
   const groups: [string, string, PackageItem[]][] = pk ? [
     ['masters', 'Mastere', pk.masters],
     ['frames', 'Startframes', pk.frames],
+    ['lines', 'Replikker (dansk tale)', pk.lines],
     ['videos', 'Videoer', pk.videos],
   ] : [];
   const every = groups.flatMap(([, , items]) => items);
@@ -184,7 +185,7 @@ function Control({ d }: { d: FilmData }) {
 }
 
 function genLabel(d: FilmData, g: FilmData['generations'][number]): string {
-  if (g.shot_id) return `Shot ${d.shots.find((s) => s.id === g.shot_id)?.code ?? ''} ${g.slot === 'video' ? 'video' : 'startframe'}`;
+  if (g.shot_id) return `Shot ${d.shots.find((s) => s.id === g.shot_id)?.code ?? ''} ${g.slot === 'video' ? 'video' : g.slot === 'dialogue' ? 'replik' : 'startframe'}`;
   return d.assets.find((a) => a.asset_versions.some((v) => v.id === g.asset_version_id))?.name ?? 'Reference';
 }
 

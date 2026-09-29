@@ -7,7 +7,7 @@
 // ikke stoppes. Ved failed og nsfw refunderer Higgsfield kreditterne.
 
 import type { ProviderSettings } from './catalog.ts';
-import { HIGGSFIELD_MODELS } from './catalog.ts';
+import { HIGGSFIELD_MODELS, HIGGSFIELD_SPEAK_MODELS } from './catalog.ts';
 import { ProviderRejectedError, type ModelInfo, type ProviderAdapter, type ProviderStatus } from './types.ts';
 
 const BASE = 'https://api.higgsfield.ai';
@@ -19,7 +19,7 @@ interface StatusBody {
   images?: { url: string }[] | null;
 }
 
-export function createHiggsfield(credentials: string, settings: ProviderSettings['higgsfield'], models: ModelInfo[] = HIGGSFIELD_MODELS, fetchFn: typeof fetch = fetch): ProviderAdapter {
+export function createHiggsfield(credentials: string, settings: ProviderSettings['higgsfield'], models: ModelInfo[] = [...HIGGSFIELD_MODELS, ...HIGGSFIELD_SPEAK_MODELS], fetchFn: typeof fetch = fetch): ProviderAdapter {
   const headers = { Authorization: `Key ${credentials}`, 'Content-Type': 'application/json', Accept: 'application/json' };
 
   async function get(id: string): Promise<StatusBody | null> {
@@ -37,15 +37,27 @@ export function createHiggsfield(credentials: string, settings: ProviderSettings
     // aldrig to gange (databasen tillader kun ét aktivt forsøg pr. generering).
     async submit(model, req) {
       if (!req.startFrameUrl) throw new ProviderRejectedError('video kræver en godkendt startframe', 400);
-      const res = await fetchFn(`${BASE}${settings.endpoint}`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
+      const speak = model === 'speak';
+      if (speak && !req.audioUrl) throw new ProviderRejectedError('talende video kræver en godkendt replik', 400);
+      const payload = speak
+        ? {
+          // Speak: munden følger replik-lyden (WAV). Varighed 5, 10 eller 15 sek.
+          input_image: { type: 'image_url', image_url: req.startFrameUrl },
+          input_audio: { type: 'audio_url', audio_url: req.audioUrl },
+          prompt: req.prompt,
+          quality: settings.speakQuality,
+          duration: speakDuration(req.durationSeconds),
+        }
+        : {
           model,
           prompt: req.prompt,
           input_images: [{ type: 'image_url', image_url: req.startFrameUrl }],
           enhance_prompt: false,
-        }),
+        };
+      const res = await fetchFn(`${BASE}${speak ? settings.speakEndpoint : settings.endpoint}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 409 && res.status !== 429) {
@@ -95,4 +107,10 @@ async function reasonOf(res: Response): Promise<string> {
   } catch {
     return '';
   }
+}
+
+// Den korteste Speak-længde, der rummer shottet.
+export function speakDuration(seconds: number | undefined): 5 | 10 | 15 {
+  const s = seconds ?? 5;
+  return s <= 5 ? 5 : s <= 10 ? 10 : 15;
 }

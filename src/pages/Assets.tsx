@@ -162,6 +162,8 @@ function AssetDetail({ d, a, section }: { d: FilmData; a: AssetRow; section: 'ch
             </ul>
           )}
 
+          {a.kind === 'character' && <VoicePicker d={d} a={a} />}
+
           <div className="card">
             <h3>Master</h3>
             <p className="muted small">Et referencebillede genereres ud fra egenskaberne og dine egne billeder. Godkender du det, bliver versionen godkendt og låst.</p>
@@ -248,6 +250,61 @@ function References({ d, v, editable }: { d: FilmData; v: AssetVersionRow; edita
           </label>
         </div>
       ) : <p className="muted small">Referencer kan kun tilføjes til en kladde-version.</p>}
+    </div>
+  );
+}
+
+type VoiceOption = { voice_id: string; name: string; preview_url: string | null; description: string };
+
+// Karakterens faste stemme til dansk tale. Samme stemme i alle replikker, så
+// karakteren lyder ens gennem hele filmen. Et skift gør replikkerne forældede.
+function VoicePicker({ d, a }: { d: FilmData; a: AssetRow }) {
+  const { busy, run } = useRun();
+  const [voices, setVoices] = useState<VoiceOption[] | null>(null);
+  const [state, setState] = useState<'idle' | 'loading' | 'missing' | 'error'>('idle');
+  const [chosen, setChosen] = useState(a.voice_id ?? '');
+  async function load() {
+    setState('loading');
+    const r = await api.voices(d.project.id);
+    if (!r.ok) return setState('error');
+    if (!r.data.configured) return setState('missing');
+    setVoices(r.data.voices);
+    setState('idle');
+  }
+  const current = voices?.find((v) => v.voice_id === chosen);
+  const play = (url: string | null) => {
+    if (url) void new Audio(url).play().catch(() => flash('Prøven kunne ikke afspilles.', 'fail'));
+  };
+  return (
+    <div className="card">
+      <div className="row between">
+        <h3>Stemme</h3>
+        {a.voice_name ? <span className="pill approved">{a.voice_name}</span> : <span className="pill missing">Ingen stemme</span>}
+      </div>
+      <p className="muted small">Replikkerne bliver til dansk tale med denne stemme, og munden i videoen følger lyden. Vælg en stemme, der passer til karakteren.</p>
+      {state === 'missing' && <Notice tone="warn">Stemmer er ikke sat op endnu. Tilføj ELEVENLABS_API_KEY som hemmelighed i Supabase.</Notice>}
+      {state === 'error' && <Notice tone="fail">Stemmerne kunne ikke hentes. Prøv igen om lidt.</Notice>}
+      {!voices ? (
+        <Button onClick={load} disabled={state === 'loading'}>{state === 'loading' ? 'Henter stemmer …' : a.voice_id ? 'Skift stemme' : 'Vælg stemme'}</Button>
+      ) : (
+        <div className="stack">
+          <div className="row">
+            <select value={chosen} onChange={(e) => setChosen(e.target.value)} aria-label="Stemme">
+              <option value="">— Vælg —</option>
+              {voices.map((v) => <option key={v.voice_id} value={v.voice_id}>{v.name}{v.description ? ` · ${v.description}` : ''}</option>)}
+            </select>
+            <Button small disabled={!current?.preview_url} onClick={() => play(current?.preview_url ?? null)}>▶ Lyt</Button>
+          </div>
+          <div className="row">
+            <Button kind="primary" disabled={!!busy || !chosen || chosen === a.voice_id}
+              onClick={() => run('voice', () => api.asset({ action: 'set_voice', asset_id: a.id, voice_id: chosen, voice_name: current?.name ?? null }), `${a.name} taler nu med stemmen ${current?.name ?? ''}.`)}>
+              Brug stemmen
+            </Button>
+            {a.voice_id && <Button kind="ghost" disabled={!!busy} onClick={() => run('voice', () => api.asset({ action: 'set_voice', asset_id: a.id, voice_id: null, voice_name: null }), 'Stemmen er fjernet.')}>Fjern stemme</Button>}
+          </div>
+          <p className="muted small">Prøven kan være på engelsk — replikkerne bliver altid dansk.</p>
+        </div>
+      )}
     </div>
   );
 }

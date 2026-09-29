@@ -4,7 +4,7 @@
 // data (repo.ts) og kalder denne funktion; tests kalder den med Golden Test Case.
 
 import { findConflicts, openConflicts, type Conflict, type ContinuityRule, type DeviationInput, type FilmRuleInput } from './continuity.ts';
-import { compilePrompt, sha256Hex, type PromptDeviation } from './prompt.ts';
+import { canonicalJson, compilePrompt, sha256Hex, type PromptDeviation } from './prompt.ts';
 import { recommend, type Recommendation } from './providers/router.ts';
 import type { ModelInfo } from './providers/types.ts';
 
@@ -28,11 +28,14 @@ export interface PlanAsset {
   consent_status: 'not_required' | 'missing' | 'confirmed';
   master_version_id: string | null;
   versions: PlanAssetVersion[];
+  // Karakterens faste stemme til dansk tale.
+  voice_id?: string | null;
+  voice_name?: string | null;
 }
 
 export interface PlanGeneration {
   id: string;
-  slot: 'reference' | 'start_frame' | 'video';
+  slot: 'reference' | 'start_frame' | 'video' | 'dialogue';
   version: number;
   status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
   review: 'pending' | 'approved' | 'rejected' | null;
@@ -55,6 +58,10 @@ export interface PlanShot {
   video_required: boolean;
   approved_start_frame_id: string | null;
   approved_video_id: string | null;
+  // Dansk tale: replikken, hvem der siger den, og den godkendte lyd.
+  dialogue?: string | null;
+  speaker_asset_id?: string | null;
+  approved_dialogue_id?: string | null;
   links: { asset_id: string; asset_version_id: string; pinned: boolean }[];
   deviations: (DeviationInput & { shot_value: string })[];
   generations: PlanGeneration[];
@@ -78,15 +85,22 @@ export interface ShotPlan {
   code: string;
   frame: { status: SlotStatus; generationId: string | null };
   video: { status: SlotStatus; generationId: string | null };
-  gates: { frame: Gate[]; video: Gate[] };
+  // Kun for shots med en replik.
+  dialogue: { status: SlotStatus; generationId: string | null } | null;
+  speaker: { assetId: string; name: string; voiceId: string | null; voiceName: string | null } | null;
+  gates: { frame: Gate[]; video: Gate[]; dialogue: Gate[] };
   conflicts: Conflict[];
   stale: { assetId: string; name: string; from: number; to: number; note: string | null }[];
-  prompts: { start_frame: { text: string; hash: string; canonical: string }; video: { text: string; hash: string; canonical: string } };
-  reco: { start_frame: Recommendation; video: Recommendation };
+  prompts: {
+    start_frame: { text: string; hash: string; canonical: string };
+    video: { text: string; hash: string; canonical: string };
+    dialogue: { text: string; hash: string; canonical: string } | null;
+  };
+  reco: { start_frame: Recommendation; video: Recommendation; dialogue: Recommendation | null };
 }
 
 export interface PackageItem {
-  slot: 'reference' | 'start_frame' | 'video';
+  slot: 'reference' | 'start_frame' | 'video' | 'dialogue';
   shotId?: string;
   assetVersionId?: string;
   label: string;
@@ -99,7 +113,7 @@ export interface PackageItem {
 
 export interface ProjectPlan {
   shots: ShotPlan[];
-  packages: { masters: PackageItem[]; frames: PackageItem[]; videos: PackageItem[] };
+  packages: { masters: PackageItem[]; frames: PackageItem[]; lines: PackageItem[]; videos: PackageItem[] };
   blocked: { shotId: string; code: string; reason: string }[];
 }
 
@@ -126,7 +140,7 @@ export async function planProject(input: PlanInput): Promise<ProjectPlan> {
   const assetById = new Map(input.assets.map((a) => [a.id, a]));
   const activeRules = input.rules.filter((r) => r.enabled).map((r) => r.text);
   const shots: ShotPlan[] = [];
-  const packages: ProjectPlan['packages'] = { masters: [], frames: [], videos: [] };
+  const packages: ProjectPlan['packages'] = { masters: [], frames: [], lines: [], videos: [] };
   const blocked: ProjectPlan['blocked'] = [];
 
   for (const s of input.shots) {
@@ -151,6 +165,13 @@ export async function planProject(input: PlanInput): Promise<ProjectPlan> {
       if (d.kind === 'attribute') return { assetCode: assetById.get(d.assetId ?? '')?.code, attribute: d.attribute ?? undefined, value: d.shot_value };
       return { value: d.shot_value, ruleText: input.rules.find((r) => r.id === d.ruleId)?.text };
     });
+    // Dansk tale: shottet har en replik og en karakter, der siger den — den
+    // valgte taler, ellers den første karakter i shottet.
+    const line = s.dialogue?.trim() ? s.dialogue.trim() : null;
+    const speakerAsset = line
+      ? (linked.find(({ asset }) => asset.id === s.speaker_asset_id && asset.kind === 'character') ?? linked.find(({ asset }) => asset.kind === 'character'))?.asset ?? null
+      : null;
+    const speech = !!(line && speakerAsset);
     const promptFor = async (slot: 'start_frame' | 'video') => {
       const compiled = compilePrompt({
         slot,
@@ -160,23 +181,32 @@ export async function planProject(input: PlanInput): Promise<ProjectPlan> {
         assets: linked.map(({ asset, version }) => ({ code: asset.code, kind: asset.kind, name: asset.name, version: version.version, attributes: version.attributes, referenceCount: version.referenceCount })),
         deviations,
         startFrameId: slot === 'video' ? s.approved_start_frame_id : undefined,
+        speech: slot === 'video' && speech ? { line: line!, audioId: s.approved_dialogue_id ?? null } : undefined,
       });
       return { ...compiled, hash: await sha256Hex(compiled.canonical) };
     };
-    const prompts = { start_frame: await promptFor('start_frame'), video: await promptFor('video') };
+    const dialoguePrompt = async () => {
+      const canonical = canonicalJson({ slot: 'dialogue', line, speaker: speakerAsset!.code, voice: speakerAsset!.voice_id ?? null, language: 'da' });
+      return { text: line!, canonical, hash: await sha256Hex(canonical) };
+    };
+    const prompts = { start_frame: await promptFor('start_frame'), video: await promptFor('video'), dialogue: speech ? await dialoguePrompt() : null };
 
     const hasCharacters = linked.some(({ asset }) => asset.kind === 'character');
     const refs = linked.reduce((n, { version }) => n + Math.min(version.referenceCount, 4), 0);
     const reco = {
       start_frame: recommend(input.models, { slot: 'start_frame', referenceImages: refs, hasCharacters }, { allowSimulated: input.allowSimulated, choice: input.choices?.[`${s.id}:start_frame`] }),
-      video: recommend(input.models, { slot: 'video', durationSeconds: s.duration_seconds, movement: s.movement, referenceImages: 1, hasCharacters }, { allowSimulated: input.allowSimulated, choice: input.choices?.[`${s.id}:video`] }),
+      video: recommend(input.models, { slot: 'video', speech, durationSeconds: s.duration_seconds, movement: speech ? undefined : s.movement, referenceImages: 1, hasCharacters }, { allowSimulated: input.allowSimulated, choice: input.choices?.[`${s.id}:video`] }),
+      dialogue: speech ? recommend(input.models, { slot: 'dialogue', referenceImages: 0, hasCharacters: true }, { allowSimulated: input.allowSimulated, choice: input.choices?.[`${s.id}:dialogue`] }) : null,
     };
 
     const lf = latestOf(s.generations, 'start_frame');
     const lv = latestOf(s.generations, 'video');
     const frame = { status: slotStatus(lf, prompts.start_frame.hash), generationId: lf?.id ?? null };
+    const ld = latestOf(s.generations, 'dialogue');
+    const dialogue = prompts.dialogue ? { status: slotStatus(ld, prompts.dialogue.hash), generationId: ld?.id ?? null } : null;
     let videoStatus = slotStatus(lv, prompts.video.hash);
     if ((videoStatus === 'approved' || videoStatus === 'needs_approval') && s.start_frame_required && frame.status !== 'approved') videoStatus = 'outdated';
+    if ((videoStatus === 'approved' || videoStatus === 'needs_approval') && dialogue && dialogue.status !== 'approved') videoStatus = 'outdated';
     const video = { status: videoStatus, generationId: lv?.id ?? null };
 
     const missingMaster = linked.filter(({ asset }) => !asset.master_version_id).map(({ asset }) => asset.name);
@@ -191,15 +221,22 @@ export async function planProject(input: PlanInput): Promise<ProjectPlan> {
       { ok: !open.length, text: open.length ? `${open.length === 1 ? 'Én konflikt' : `${open.length} konflikter`} skal afklares` : 'Ingen kontinuitetskonflikter' },
       { ok: !!reco.start_frame.pick, text: reco.start_frame.pick ? `Model: ${reco.start_frame.pick.label}` : 'Ingen billedmodel kan lave dette shot' },
     ];
+    const dialogueGates: Gate[] = speech ? [
+      frameGates[0]!,
+      { ok: !noConsent.length, text: noConsent.length ? `Samtykke mangler: ${noConsent.join(', ')}` : 'Samtykke foreligger for alle karakterer' },
+      { ok: !!speakerAsset!.voice_id, text: speakerAsset!.voice_id ? `Stemme: ${speakerAsset!.voice_name ?? speakerAsset!.name}` : `Vælg en stemme til ${speakerAsset!.name}` },
+      { ok: !!reco.dialogue?.pick, text: reco.dialogue?.pick ? `Model: ${reco.dialogue.pick.label}` : 'Ingen stemmemodel er sat op' },
+    ] : [];
     const videoGates: Gate[] = [
       ...(s.start_frame_required ? [{ ok: frame.status === 'approved', text: frame.status === 'approved' ? 'Startframen er godkendt' : 'Kræver en godkendt startframe' }] : []),
+      ...(dialogue ? [{ ok: dialogue.status === 'approved', text: dialogue.status === 'approved' ? 'Replikken er godkendt' : 'Kræver en godkendt replik' }] : []),
       ...frameGates.slice(0, 6),
       { ok: !!reco.video.pick, text: reco.video.pick ? `Model: ${reco.video.pick.label}` : `Ingen videomodel kan lave dette shot: ${reco.video.excluded.map((x) => `${x.model.label} ${x.why}`).join('; ')}` },
     ];
     const ok = (g: Gate[]) => g.every((x) => x.ok);
 
-    const item = (slot: 'start_frame' | 'video', r: Recommendation): PackageItem => ({
-      slot, shotId: s.id, label: `${s.code} · ${slot === 'start_frame' ? 'startframe' : 'video'}`,
+    const item = (slot: 'start_frame' | 'video' | 'dialogue', r: Recommendation): PackageItem => ({
+      slot, shotId: s.id, label: `${s.code} · ${slot === 'start_frame' ? 'startframe' : slot === 'dialogue' ? 'replik' : speech ? 'talende video' : 'video'}`,
       costCents: Math.max(r.pick?.priceCents ?? 0, r.fallback?.priceCents ?? 0),
       pick: r.pick ? { provider: r.pick.provider, model: r.pick.model, label: r.pick.label } : null,
       fallback: r.fallback ? { provider: r.fallback.provider, model: r.fallback.model } : null,
@@ -208,8 +245,14 @@ export async function planProject(input: PlanInput): Promise<ProjectPlan> {
     if (redo.includes(frame.status) && ok(frameGates)) packages.frames.push(item('start_frame', reco.start_frame));
     else if (s.video_required && redo.includes(video.status) && ok(videoGates)) packages.videos.push(item('video', reco.video));
     else if (frame.status === 'draft' && !ok(frameGates)) blocked.push({ shotId: s.id, code: s.code, reason: frameGates.find((g) => !g.ok)!.text });
+    // Replikken kan laves sideløbende med startframen.
+    if (dialogue && reco.dialogue && redo.includes(dialogue.status)) {
+      if (ok(dialogueGates)) packages.lines.push(item('dialogue', reco.dialogue));
+      else if (ok(frameGates)) blocked.push({ shotId: s.id, code: s.code, reason: dialogueGates.find((g) => !g.ok)!.text });
+    }
 
-    shots.push({ shotId: s.id, code: s.code, frame, video, gates: { frame: frameGates, video: videoGates }, conflicts, stale, prompts, reco });
+    const speaker = speakerAsset ? { assetId: speakerAsset.id, name: speakerAsset.name, voiceId: speakerAsset.voice_id ?? null, voiceName: speakerAsset.voice_name ?? null } : null;
+    shots.push({ shotId: s.id, code: s.code, frame, video, dialogue, speaker, gates: { frame: frameGates, video: videoGates, dialogue: dialogueGates }, conflicts, stale, prompts, reco });
   }
 
   for (const a of input.assets) {

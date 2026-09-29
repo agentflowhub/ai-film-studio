@@ -19,7 +19,7 @@ import { loadPlanInput, requireProjectMember } from '../_shared/repo.ts';
 import { serve } from '../_shared/runtime.ts';
 import { ProductionStartRequestSchema, type ProductionItem } from '../_shared/schemas.ts';
 
-const TASK_TYPE = { reference: 'asset.master_generate', start_frame: 'frame.generate', video: 'video.generate' } as const;
+const TASK_TYPE = { reference: 'asset.master_generate', start_frame: 'frame.generate', video: 'video.generate', dialogue: 'dialogue.generate' } as const;
 
 serve('production-start', ProductionStartRequestSchema, async ({ admin, userId, body, env }) => {
   const project = await requireProjectMember(admin, body.project_id, userId);
@@ -35,7 +35,7 @@ serve('production-start', ProductionStartRequestSchema, async ({ admin, userId, 
   const input = await loadPlanInput(admin, project, registry, choices);
   const plan = await planProject(input);
 
-  const eligible = [...plan.packages.masters, ...plan.packages.frames, ...plan.packages.videos];
+  const eligible = [...plan.packages.masters, ...plan.packages.frames, ...plan.packages.lines, ...plan.packages.videos];
   const match = (i: ProductionItem): PackageItem | undefined =>
     eligible.find((e) => e.slot === i.slot && (i.slot === 'reference' ? e.assetVersionId === i.asset_version_id : e.shotId === i.shot_id));
   const chosen = body.items.map((i) => ({ item: i, pkg: match(i) }));
@@ -84,6 +84,7 @@ serve('production-start', ProductionStartRequestSchema, async ({ admin, userId, 
       if (child.error) throw child.error;
 
       let prompt: string, hash: string, target: Record<string, string>, specVersion: number | null = null;
+      let voiceId: string | null = null;
       if (item.slot === 'reference') {
         const asset = input.assets.find((a) => a.versions.some((v) => v.id === item.asset_version_id))!;
         const version = asset.versions.find((v) => v.id === item.asset_version_id)!;
@@ -92,8 +93,11 @@ serve('production-start', ProductionStartRequestSchema, async ({ admin, userId, 
         target = { asset_version_id: version.id };
       } else {
         const sp = plan.shots.find((s) => s.shotId === item.shot_id)!;
-        prompt = sp.prompts[item.slot].text;
-        hash = sp.prompts[item.slot].hash;
+        const p = sp.prompts[item.slot]!;
+        prompt = p.text;
+        hash = p.hash;
+        // Replikken siges med talerens faste stemme — den følger med i input.
+        if (item.slot === 'dialogue') voiceId = sp.speaker?.voiceId ?? null;
         target = { shot_id: item.shot_id };
         const row = await admin.from('shots').select('spec_version').eq('id', item.shot_id).single();
         if (row.error) throw row.error;
@@ -113,7 +117,7 @@ serve('production-start', ProductionStartRequestSchema, async ({ admin, userId, 
         .insert({
           org_id: project.org_id, project_id: project.id, task_id: child.data.id, slot: item.slot, ...target,
           version: ((prev.data?.version as number | undefined) ?? 0) + 1,
-          input: { prompt, pick: pkg!.pick, fallback: pkg!.fallback }, input_hash: hash, spec_version: specVersion,
+          input: { prompt, pick: pkg!.pick, fallback: pkg!.fallback, ...(voiceId ? { voice_id: voiceId } : {}) }, input_hash: hash, spec_version: specVersion,
           cost_estimate_cents: pkg!.costCents,
         })
         .select('id')

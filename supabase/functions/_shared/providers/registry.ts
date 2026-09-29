@@ -1,9 +1,11 @@
 // Hvilke providere findes? En provider er med, når dens hemmelighed er sat:
 //   OPENAI_API_KEY          → OpenAI (ChatGPT Images) til billeder
-//   HIGGSFIELD_CREDENTIALS  → Higgsfield til video ("KEY_ID:KEY_SECRET")
+//   HIGGSFIELD_CREDENTIALS  → Higgsfield til video og talende video ("KEY_ID:KEY_SECRET")
+//   ELEVENLABS_API_KEY      → ElevenLabs til dansk tale
 // Simulatoren kan kun bruges, når ALLOW_SIMULATOR_PROVIDER=true — aldrig i produktion.
 
-import { HIGGSFIELD_MODELS, OPENAI_MODELS, providerSettings, withPrices } from './catalog.ts';
+import { ELEVENLABS_MODELS, HIGGSFIELD_MODELS, HIGGSFIELD_SPEAK_MODELS, OPENAI_MODELS, providerSettings, withPrices } from './catalog.ts';
+import { createElevenLabs } from './elevenlabs.ts';
 import { createHiggsfield } from './higgsfield.ts';
 import { createOpenAiImages } from './openai-images.ts';
 import { createSimulator, SIMULATOR_MODELS } from './simulator.ts';
@@ -29,8 +31,14 @@ export function createRegistry(getEnv: (key: string) => string | undefined, fetc
   }
   const hf = getEnv('HIGGSFIELD_CREDENTIALS')?.trim();
   if (hf && hf.includes(':')) {
-    const m = withPrices(HIGGSFIELD_MODELS, getEnv);
+    const m = withPrices([...HIGGSFIELD_MODELS, ...HIGGSFIELD_SPEAK_MODELS], getEnv);
     adapters.set('higgsfield', createHiggsfield(hf, settings.higgsfield, m, fetchFn));
+    models.push(...m);
+  }
+  const eleven = getEnv('ELEVENLABS_API_KEY')?.trim();
+  if (eleven) {
+    const m = withPrices(ELEVENLABS_MODELS, getEnv);
+    adapters.set('elevenlabs', createElevenLabs(eleven, settings.elevenlabs, m, fetchFn));
     models.push(...m);
   }
   if (allowSimulated) {

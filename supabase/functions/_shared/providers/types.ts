@@ -1,7 +1,8 @@
 // Provider-laget: billed- og videomodeller bag ét interface. Brugeren behøver
 // ikke kende modellerne; routeren (router.ts) vælger ud fra shottets behov.
 
-export type Capability = 'text_to_image' | 'image_to_image' | 'image_to_video' | 'text_to_video';
+// speech_to_video: video fra en startframe OG en lydfil, hvor munden følger lyden.
+export type Capability = 'text_to_image' | 'image_to_image' | 'image_to_video' | 'text_to_video' | 'text_to_speech' | 'speech_to_video';
 
 export interface ModelInfo {
   provider: string;
@@ -23,6 +24,10 @@ export interface GenerationRequest {
   referenceUrls: string[];
   startFrameUrl?: string;
   durationSeconds?: number;
+  // Replik: stemmen, der skal tale (prompt er selve replikken).
+  voiceId?: string;
+  // Talende video: den godkendte replik-lyd, munden skal følge.
+  audioUrl?: string;
   aspectRatio: '16:9';
 }
 
@@ -50,4 +55,7 @@ export interface ProviderAdapter {
   status(providerJobId: string): Promise<ProviderStatus>;
   // Skal returnere true, når provideren bekræfter, at jobbet er stoppet og ikke faktureres.
   cancel(providerJobId: string): Promise<boolean>;
+  // Providere, der svarer med det samme (fx tekst-til-tale på få sekunder),
+  // leverer resultatet direkte i stedet for et job, der skal følges.
+  run?(model: string, req: GenerationRequest, idempotencyKey: string): Promise<{ bytes: Uint8Array; mime: string }>;
 }

@@ -40,7 +40,7 @@ export async function loadPlanInput(
     admin.from('film_rules').select('id, text, pattern, reason, enabled').eq('project_id', project.id).order('created_at'),
     admin
       .from('assets')
-      .select('id, code, kind, name, consent_status, master_version_id, asset_versions!asset_versions_asset_id_fkey(id, version, status, attributes, continuity_rules, note, asset_references(count))')
+      .select('id, code, kind, name, consent_status, master_version_id, voice_id, voice_name, asset_versions!asset_versions_asset_id_fkey(id, version, status, attributes, continuity_rules, note, asset_references(count))')
       .eq('project_id', project.id),
   ]);
   for (const r of [dna, rules, assets]) if (r.error) throw r.error;
@@ -52,6 +52,7 @@ export async function loadPlanInput(
       .from('shots')
       .select(`id, code, duration_seconds, shot_type, lens_mm, movement, action, notes, performance, lighting,
         start_frame_required, video_required, approved_start_frame_id, approved_video_id,
+        dialogue, speaker_asset_id, approved_dialogue_id,
         shot_assets(asset_id, asset_version_id, pinned),
         shot_deviations(kind, asset_id, attribute, rule_id, shot_value),
         generations!generations_shot_id_fkey(id, slot, version, status, review, input_hash)`)
@@ -72,6 +73,8 @@ export async function loadPlanInput(
     name: a.name as string,
     consent_status: a.consent_status as PlanAsset['consent_status'],
     master_version_id: (a.master_version_id as string | null) ?? null,
+    voice_id: (a.voice_id as string | null) ?? null,
+    voice_name: (a.voice_name as string | null) ?? null,
     versions: ((a.asset_versions as Raw[]) ?? []).map((v) => ({
       id: v.id as string,
       version: v.version as number,
@@ -98,6 +101,9 @@ export async function loadPlanInput(
     video_required: s.video_required as boolean,
     approved_start_frame_id: (s.approved_start_frame_id as string | null) ?? null,
     approved_video_id: (s.approved_video_id as string | null) ?? null,
+    dialogue: (s.dialogue as string | null) ?? null,
+    speaker_asset_id: (s.speaker_asset_id as string | null) ?? null,
+    approved_dialogue_id: (s.approved_dialogue_id as string | null) ?? null,
     links: ((s.shot_assets as Raw[]) ?? []).map((l) => ({ asset_id: l.asset_id as string, asset_version_id: l.asset_version_id as string, pinned: l.pinned as boolean })),
     deviations: ((s.shot_deviations as Raw[]) ?? []).map((d) => ({
       kind: d.kind as 'attribute' | 'rule',
@@ -108,7 +114,7 @@ export async function loadPlanInput(
     })),
     generations: ((s.generations as Raw[]) ?? []).map((g) => ({
       id: g.id as string,
-      slot: g.slot as 'start_frame' | 'video',
+      slot: g.slot as 'start_frame' | 'video' | 'dialogue',
       version: g.version as number,
       status: g.status as PlanShot['generations'][number]['status'],
       review: g.review as PlanShot['generations'][number]['review'],

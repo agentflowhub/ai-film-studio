@@ -36,6 +36,28 @@ export const HIGGSFIELD_MODELS: ModelInfo[] = [
   },
 ];
 
+// Higgsfield Speak: video fra startframen og replik-lyden, hvor munden følger
+// lyden. Klippet er 5, 10 eller 15 sek.; den korteste, der rummer shottet, vælges.
+export const HIGGSFIELD_SPEAK_MODELS: ModelInfo[] = [
+  {
+    provider: 'higgsfield', model: 'speak', label: 'Higgsfield Speak (læbesynk)',
+    capabilities: ['speech_to_video'], maxReferenceImages: 1, minSeconds: 1, maxSeconds: 15, priceCents: 900, quality: 3,
+  },
+];
+
+// ElevenLabs: dansk tale. v3 er mest udtryksfuld; Multilingual v2 er reserven.
+// Prisen er et skøn pr. replik (ElevenLabs tager betaling pr. tegn).
+export const ELEVENLABS_MODELS: ModelInfo[] = [
+  {
+    provider: 'elevenlabs', model: 'eleven_v3', label: 'ElevenLabs v3 (dansk tale)',
+    capabilities: ['text_to_speech'], maxReferenceImages: 0, priceCents: 100, quality: 3,
+  },
+  {
+    provider: 'elevenlabs', model: 'eleven_multilingual_v2', label: 'ElevenLabs Multilingual v2 (dansk tale)',
+    capabilities: ['text_to_speech'], maxReferenceImages: 0, priceCents: 100, quality: 2,
+  },
+];
+
 export interface ProviderSettings {
   openai: {
     // Modellen, der styrer Responses-kaldet og kalder billedværktøjet. Selve
@@ -44,12 +66,16 @@ export interface ProviderSettings {
     size: string;
     quality: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto';
   };
-  higgsfield: { endpoint: string };
+  higgsfield: { endpoint: string; speakEndpoint: string; speakQuality: 'mid' | 'high' };
+  // WAV, fordi Higgsfield Speak kun tager WAV. 44,1 kHz kræver ElevenLabs Pro,
+  // så 24 kHz er standard.
+  elevenlabs: { outputFormat: string; languageCode: string };
 }
 
 const SETTINGS: ProviderSettings = {
   openai: { responsesModel: 'gpt-5.4-mini', size: '1536x864', quality: 'high' },
-  higgsfield: { endpoint: '/v1/image2video/dop' },
+  higgsfield: { endpoint: '/v1/image2video/dop', speakEndpoint: '/v1/speak/higgsfield', speakQuality: 'high' },
+  elevenlabs: { outputFormat: 'wav_24000', languageCode: 'da' },
 };
 
 export function providerSettings(getEnv: (key: string) => string | undefined): ProviderSettings {
@@ -59,6 +85,10 @@ export function providerSettings(getEnv: (key: string) => string | undefined): P
       responsesModel: getEnv('FILM_OPENAI_RESPONSES_MODEL')?.trim() || SETTINGS.openai.responsesModel,
     },
     higgsfield: SETTINGS.higgsfield,
+    elevenlabs: {
+      ...SETTINGS.elevenlabs,
+      outputFormat: /^wav_\d+$/.test(getEnv('FILM_ELEVENLABS_FORMAT')?.trim() ?? '') ? getEnv('FILM_ELEVENLABS_FORMAT')!.trim() : SETTINGS.elevenlabs.outputFormat,
+    },
   };
 }
 

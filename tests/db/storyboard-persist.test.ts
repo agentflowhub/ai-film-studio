@@ -29,11 +29,11 @@ const draft: StoryboardDraft = {
   ],
   scenes: [
     { heading: 'Køkkenet, morgen', purpose: 'Vandhanen drypper.', shots: [
-      { duration_seconds: 3.5, shot_type: 'close_up', lens_mm: 85, movement: 'static', camera: 'Nær på vandhanen', action: 'Vandhanen drypper.', dialogue: null, performance: null, lighting: 'morgenlys', audio: 'dryp', asset_keys: ['lejlighed'] },
-      { duration_seconds: 4, shot_type: 'medium', lens_mm: 35, movement: 'handheld', camera: 'Håndholdt', action: 'Beboeren sukker og tager telefonen frem.', dialogue: '', performance: 'Træt', lighting: null, audio: null, asset_keys: ['beboer', 'telefon', 'lejlighed', 'beboer'] },
+      { duration_seconds: 3.5, shot_type: 'close_up', lens_mm: 85, movement: 'static', camera: 'Nær på vandhanen', action: 'Vandhanen drypper.', dialogue: null, performance: null, lighting: 'morgenlys', audio: 'dryp', asset_keys: ['lejlighed'], speaker_key: null },
+      { duration_seconds: 4, shot_type: 'medium', lens_mm: 35, movement: 'handheld', camera: 'Håndholdt', action: 'Beboeren sukker og tager telefonen frem.', dialogue: '', performance: 'Træt', lighting: null, audio: null, asset_keys: ['beboer', 'telefon', 'lejlighed', 'beboer'], speaker_key: 'beboer' },
     ] },
     { heading: 'Opgangen', purpose: 'Viceværten svarer.', shots: [
-      { duration_seconds: 4, shot_type: 'over_the_shoulder', lens_mm: null, movement: 'dolly', camera: 'Over skulderen', action: 'Viceværten læser beskeden i appen.', dialogue: 'Den er klaret i dag.', performance: 'Venlig', lighting: null, audio: null, asset_keys: ['vicevaert', 'telefon'] },
+      { duration_seconds: 4, shot_type: 'over_the_shoulder', lens_mm: null, movement: 'dolly', camera: 'Over skulderen', action: 'Viceværten læser beskeden i appen.', dialogue: 'Den er klaret i dag.', performance: 'Venlig', lighting: null, audio: null, asset_keys: ['vicevaert', 'telefon'], speaker_key: 'vicevaert' },
     ] },
   ],
 };
@@ -60,7 +60,9 @@ describe('storyboard fra Claude gemmes som storyboard-generate gør', () => {
       }
 
       for (const shot of flattenShots(draft)) {
-        const { asset_keys, ...cols } = shot;
+        const { asset_keys, speaker_key, ...rest } = shot;
+        const speaker = speaker_key ? byKey.get(speaker_key) : undefined;
+        const cols = { ...rest, speaker_asset_id: speaker?.kind === 'character' ? speaker.assetId : null };
         const names = Object.keys(cols);
         const r = await c.query<{ id: string }>(
           `insert into public.shots(org_id, storyboard_id, ${names.join(', ')}) values ($1, $2, ${names.map((_, i) => `$${i + 3}`).join(', ')}) returning id`,
@@ -74,6 +76,10 @@ describe('storyboard fra Claude gemmes som storyboard-generate gør', () => {
       }
       const n = await c.query<{ n: string }>(`select count(*) as n from public.shots where storyboard_id = $1`, [sb.rows[0]!.id]);
       expect(Number(n.rows[0]!.n)).toBe(3);
+      const speakers = await c.query<{ code: string; speaker: string | null }>(
+        `select s.code, a.name as speaker from public.shots s left join public.assets a on a.id = s.speaker_asset_id where s.storyboard_id = $1 order by s.code`, [sb.rows[0]!.id]);
+      // Shot 2 har en tom replik ('') og får derfor ingen taler.
+      expect(speakers.rows.map((r) => r.speaker)).toEqual([null, null, 'Viceværten']);
     });
   });
 });

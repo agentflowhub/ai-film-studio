@@ -10,13 +10,13 @@ export interface ShotState {
 
 export function shotState(p: ShotPlanView | undefined): ShotState {
   if (!p) return { status: 'draft', label: 'Kladde' };
-  const f = p.frame.status, v = p.video.status;
+  const f = p.frame.status, v = p.video.status, dl = p.dialogue?.status;
   const open = p.conflicts.filter((c) => !c.allowed).length;
-  if (f === 'failed' || v === 'failed') return { status: 'failed', label: 'Fejlet' };
+  if (f === 'failed' || v === 'failed' || dl === 'failed') return { status: 'failed', label: 'Fejlet' };
   if (p.stale.length || f === 'outdated' || v === 'outdated') return { status: 'outdated', label: 'Forældet' };
   if (open) return { status: 'needs_approval', label: 'Kræver et valg' };
-  if (f === 'generating' || v === 'generating') return { status: 'generating', label: 'Genererer' };
-  if (f === 'needs_approval' || v === 'needs_approval') return { status: 'needs_approval', label: 'Til gennemsyn' };
+  if (f === 'generating' || v === 'generating' || dl === 'generating') return { status: 'generating', label: 'Genererer' };
+  if (f === 'needs_approval' || v === 'needs_approval' || dl === 'needs_approval') return { status: 'needs_approval', label: 'Til gennemsyn' };
   if (v === 'approved') return { status: 'approved', label: 'Færdig' };
   if (f === 'rejected' || v === 'rejected') return { status: 'rejected', label: 'Afvist' };
   if (f === 'approved') return { status: 'draft', label: p.gates.video.every((g) => g.ok) ? 'Klar til video' : 'Mangler noget' };

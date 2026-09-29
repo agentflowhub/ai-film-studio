@@ -73,6 +73,8 @@ export interface ShotRow {
   spec_version: number;
   approved_start_frame_id: string | null;
   approved_video_id: string | null;
+  speaker_asset_id: string | null;
+  approved_dialogue_id: string | null;
   shot_assets: { asset_id: string; asset_version_id: string; pinned: boolean }[];
 }
 
@@ -93,12 +95,14 @@ export interface AssetRow {
   role: string | null;
   consent_status: 'not_required' | 'missing' | 'confirmed';
   master_version_id: string | null;
+  voice_id: string | null;
+  voice_name: string | null;
   asset_versions: AssetVersionRow[];
 }
 
 export interface GenerationRow {
   id: string;
-  slot: 'reference' | 'start_frame' | 'video';
+  slot: 'reference' | 'start_frame' | 'video' | 'dialogue';
   shot_id: string | null;
   asset_version_id: string | null;
   version: number;
@@ -150,17 +154,19 @@ export interface ShotPlanView {
   code: string;
   frame: { status: SlotStatus; generationId: string | null };
   video: { status: SlotStatus; generationId: string | null };
-  gates: { frame: Gate[]; video: Gate[] };
+  dialogue: { status: SlotStatus; generationId: string | null } | null;
+  speaker: { assetId: string; name: string; voiceId: string | null; voiceName: string | null } | null;
+  gates: { frame: Gate[]; video: Gate[]; dialogue: Gate[] };
   conflicts: Conflict[];
   stale: { assetId: string; name: string; from: number; to: number; note: string | null }[];
-  prompts: { start_frame: { text: string; hash: string }; video: { text: string; hash: string } };
-  reco: { start_frame: Recommendation; video: Recommendation };
+  prompts: { start_frame: { text: string; hash: string }; video: { text: string; hash: string }; dialogue: { text: string; hash: string } | null };
+  reco: { start_frame: Recommendation; video: Recommendation; dialogue: Recommendation | null };
 }
 
 export interface PlanResponse {
   shots: ShotPlanView[];
-  packages: { masters: PackageItem[]; frames: PackageItem[]; videos: PackageItem[] };
-  totals: { masters: number; frames: number; videos: number };
+  packages: { masters: PackageItem[]; frames: PackageItem[]; lines: PackageItem[]; videos: PackageItem[] };
+  totals: { masters: number; frames: number; lines: number; videos: number };
   blocked: { shotId: string; code: string; reason: string }[];
   budget: Budget;
   simulated: boolean;

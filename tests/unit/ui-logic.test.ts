@@ -15,9 +15,10 @@ function plan(over: Partial<ShotPlanView> = {}): ShotPlanView {
   return {
     shotId: 's1', code: '01',
     frame: { status: 'draft', generationId: null }, video: { status: 'draft', generationId: null },
-    gates: { frame: ok, video: no }, conflicts: [], stale: [],
-    prompts: { start_frame: { text: '', hash: '' }, video: { text: '', hash: '' } },
-    reco: { start_frame: reco, video: reco },
+    dialogue: null, speaker: null,
+    gates: { frame: ok, video: no, dialogue: [] }, conflicts: [], stale: [],
+    prompts: { start_frame: { text: '', hash: '' }, video: { text: '', hash: '' }, dialogue: null },
+    reco: { start_frame: reco, video: reco, dialogue: null },
     ...over,
   };
 }
@@ -35,8 +36,8 @@ describe('shotState', () => {
     expect(shotState(plan({ conflicts: [{ ...c, allowed: true }] })).label).toBe('Klar til startframe');
   });
   it('går fra startframe til video til færdig', () => {
-    expect(shotState(plan({ gates: { frame: no, video: no } })).label).toBe('Mangler noget');
-    expect(shotState(plan({ frame: { status: 'approved', generationId: 'g' }, gates: { frame: ok, video: ok } })).label).toBe('Klar til video');
+    expect(shotState(plan({ gates: { frame: no, video: no, dialogue: [] } })).label).toBe('Mangler noget');
+    expect(shotState(plan({ frame: { status: 'approved', generationId: 'g' }, gates: { frame: ok, video: ok, dialogue: [] } })).label).toBe('Klar til video');
     expect(shotState(plan({ frame: { status: 'approved', generationId: 'g' }, video: { status: 'needs_approval', generationId: 'v' } })).label).toBe('Til gennemsyn');
     expect(shotState(plan({ frame: { status: 'approved', generationId: 'g' }, video: { status: 'approved', generationId: 'v' } })).label).toBe('Færdig');
   });

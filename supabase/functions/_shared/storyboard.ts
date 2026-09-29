@@ -26,6 +26,7 @@ export interface FlatShot {
   lighting: string | null;
   audio: string | null;
   asset_keys: string[];
+  speaker_key: string | null;
 }
 
 export function totalSeconds(draft: StoryboardDraft): number {
@@ -105,6 +106,8 @@ export function flattenShots(draft: StoryboardDraft): FlatShot[] {
       lighting: shot.lighting,
       audio: shot.audio,
       asset_keys: [...new Set(shot.asset_keys)],
+      // Taleren tæller kun, når shottet har en replik, og taleren er med i shottet.
+      speaker_key: shot.dialogue?.trim() && shot.speaker_key && shot.asset_keys.includes(shot.speaker_key) ? shot.speaker_key : null,
     })),
   );
 }

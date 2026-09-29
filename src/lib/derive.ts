@@ -45,7 +45,7 @@ export const packageTotal = (items: PackageItem[]) => items.reduce((n, i) => n +
 
 export function allPackages(d: FilmData): PackageItem[] {
   const p = d.plan?.packages;
-  return p ? [...p.masters, ...p.frames, ...p.videos] : [];
+  return p ? [...p.masters, ...p.frames, ...p.lines, ...p.videos] : [];
 }
 
 export function spentCents(d: FilmData): number {
@@ -58,7 +58,7 @@ export interface Activity {
   tone: 'ok' | 'fail' | 'info' | 'old';
 }
 
-const SLOT: Record<string, string> = { reference: 'Referencebillede', start_frame: 'Startframe', video: 'Video' };
+const SLOT: Record<string, string> = { reference: 'Referencebillede', start_frame: 'Startframe', video: 'Video', dialogue: 'Replik' };
 
 export function recentActivity(d: FilmData, limit = 6): Activity[] {
   const code = (id: string | null) => d.shots.find((s) => s.id === id)?.code;

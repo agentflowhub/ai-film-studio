@@ -6,6 +6,8 @@
 //   confirm_consent samtykke til at generere billeder af en karakter
 //   set_master      gør en godkendt version til master; shots på ældre
 //                   versioner bliver forældede (se plan.ts)
+//   set_voice       karakterens faste stemme til dansk tale; replikker med
+//                   en anden stemme bliver forældede (se plan.ts)
 
 import { toAssetRows } from '../_shared/assets.ts';
 import { isOrgMember, type Admin } from '../_shared/db.ts';
@@ -74,6 +76,15 @@ serve('asset-save', AssetSaveRequestSchema, async ({ admin, userId, body }) => {
       if (upd.error) throw upd.error;
       log('info', 'asset.consent_confirmed', { asset_id: a.id });
       return json({ asset_id: a.id, consent_status: 'confirmed' });
+    }
+    case 'set_voice': {
+      const a = await assetOrg(admin, body.asset_id);
+      if (!a || !(await isOrgMember(admin, a.org_id, userId))) return apiError('not_found', 404);
+      if (a.kind !== 'character') return apiError('invalid_input', 400);
+      const upd = await admin.from('assets').update({ voice_id: body.voice_id, voice_name: body.voice_id ? body.voice_name : null }).eq('id', a.id);
+      if (upd.error) throw upd.error;
+      log('info', 'asset.voice_set', { asset_id: a.id });
+      return json({ asset_id: a.id, voice_id: body.voice_id });
     }
     case 'set_master': {
       const v = await admin.from('asset_versions').select('id, org_id, asset_id, status').eq('id', body.asset_version_id).maybeSingle();

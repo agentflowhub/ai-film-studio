@@ -22,12 +22,17 @@ serve('production-plan', ProductionPlanRequestSchema, async ({ admin, userId, bo
     // Den kanoniske form er intern; UI'et viser prompten og hashen.
     shots: plan.shots.map(({ prompts, ...s }) => ({
       ...s,
-      prompts: { start_frame: { text: prompts.start_frame.text, hash: prompts.start_frame.hash }, video: { text: prompts.video.text, hash: prompts.video.hash } },
+      prompts: {
+        start_frame: { text: prompts.start_frame.text, hash: prompts.start_frame.hash },
+        video: { text: prompts.video.text, hash: prompts.video.hash },
+        dialogue: prompts.dialogue ? { text: prompts.dialogue.text, hash: prompts.dialogue.hash } : null,
+      },
     })),
     packages: plan.packages,
     totals: {
       masters: packageTotal(plan.packages.masters),
       frames: packageTotal(plan.packages.frames),
+      lines: packageTotal(plan.packages.lines),
       videos: packageTotal(plan.packages.videos),
     },
     blocked: plan.blocked,

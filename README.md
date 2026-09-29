@@ -94,6 +94,8 @@ er endnu kørt mod et rigtigt Supabase-projekt eller rigtige API-nøgler.
 |---|---|---|---|
 | OpenAI — ChatGPT Images | Referencebilleder og startframes | `OPENAI_API_KEY` | `gpt-image-2.5-sunburst` (præcis), `gpt-image-2.5-flare` (hurtig, reserve) |
 | Higgsfield | Video fra den godkendte startframe | `HIGGSFIELD_CREDENTIALS` (`KEY_ID:KEY_SECRET`) | DoP `dop-standard`, `dop-turbo` (reserve) |
+| ElevenLabs | Dansk tale: replikker med karakterens faste stemme | `ELEVENLABS_API_KEY` | `eleven_v3`, `eleven_multilingual_v2` (reserve) |
+| Higgsfield Speak | Talende video: munden følger den godkendte replik | `HIGGSFIELD_CREDENTIALS` | `speak` (5, 10 eller 15 sek.) |
 
 - En provider er kun aktiv, når dens hemmelighed er sat. Modeller, evner og
   priser står i `catalog.ts`; priser (øre pr. generering, grundlaget for
@@ -107,6 +109,10 @@ er endnu kørt mod et rigtigt Supabase-projekt eller rigtige API-nøgler.
   to betalte jobs); genereringen fejler i stedet, og et menneske tager stilling.
 - Reserven kan være en anden model hos samme provider. Et nyt forsøg kræver
   stadig, at det forrige er bekræftet stoppet (databasens `attempt_failover_guard`).
+- **Dansk tale** (migration 004): en karakter får en fast stemme; et shot med
+  replik laves i tre godkendte trin — startframe og replik-lyd (sideløbende),
+  derefter video, hvor munden følger den godkendte lyd. Skiftes replik eller
+  stemme, bliver lyden forældet; skiftes lyden, bliver videoen forældet.
 - Simulatoren (`ALLOW_SIMULATOR_PROVIDER=true`) findes fortsat til udvikling og
   test. Den kan aldrig bruges, når `APP_ENV=production`.
 

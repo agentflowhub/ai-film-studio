@@ -40,6 +40,9 @@ export interface PromptInput {
   deviations: PromptDeviation[];
   // For video: den godkendte startframe, videoen bygger på. Skiftes den, er videoen forældet.
   startFrameId?: string | null;
+  // For en talende video: replikken og den godkendte lyd, munden skal følge.
+  // Skiftes lyden, er videoen forældet. Udelades for stumme shots.
+  speech?: { line: string; audioId: string | null };
 }
 
 export interface CompiledPrompt {
@@ -82,6 +85,7 @@ export function compilePrompt(input: PromptInput): CompiledPrompt {
   const ruleDevs = input.deviations.filter((d) => d.ruleText);
   if (ruleDevs.length) lines.push(`Bevidste undtagelser: ${ruleDevs.map((d) => `"${d.ruleText}" gælder ikke her`).join('; ')}.`);
   if (input.slot === 'video') lines.push('Start fra den vedlagte, godkendte startframe og bevar komposition, karakterer og lys.');
+  if (input.slot === 'video' && input.speech) lines.push(`Replik på dansk — munden følger den vedlagte lyd: "${input.speech.line}"`);
 
   return { text: lines.join('\n'), canonical: canonicalJson({ ...input, assets, rules: [...input.rules].sort() }) };
 }

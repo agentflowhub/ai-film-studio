@@ -143,6 +143,8 @@ export const ShotDraftSchema = z.object({
   lighting: z.string().max(200).nullable(),
   audio: z.string().max(200).nullable(),
   asset_keys: z.array(z.string()).min(1).max(10),
+  // Hvem siger replikken: nøglen på en karakter i asset_keys. null uden replik.
+  speaker_key: z.string().nullable(),
 });
 export type ShotDraft = z.infer<typeof ShotDraftSchema>;
 
@@ -213,6 +215,8 @@ export const AssetSaveRequestSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('edit_draft'), asset_version_id: z.uuid(), attributes: z.record(z.string().min(1).max(40), z.string().max(200)) }),
   z.object({ action: z.literal('confirm_consent'), asset_id: z.uuid() }),
   z.object({ action: z.literal('set_master'), asset_version_id: z.uuid() }),
+  // Karakterens faste stemme (ElevenLabs voice_id). null fjerner stemmen.
+  z.object({ action: z.literal('set_voice'), asset_id: z.uuid(), voice_id: z.string().regex(/^[A-Za-z0-9_-]{4,64}$/).nullable(), voice_name: z.string().trim().min(1).max(120).nullable() }),
 ]);
 
 export const ShotUpdateRequestSchema = z.object({
@@ -227,6 +231,7 @@ export const ShotUpdateRequestSchema = z.object({
     movement: z.enum(MOVEMENTS),
     performance: z.string().trim().max(80).nullable(),
     lighting: z.string().trim().max(200).nullable(),
+    speaker_asset_id: z.uuid().nullable(),
   }).partial(),
 });
 
@@ -240,11 +245,13 @@ export const ShotContinuityRequestSchema = z.discriminatedUnion('action', [
 
 export const ProductionItemSchema = z.discriminatedUnion('slot', [
   z.object({ slot: z.literal('reference'), asset_version_id: z.uuid() }),
-  z.object({ slot: z.enum(['start_frame', 'video']), shot_id: z.uuid(), choice: z.string().max(120).nullable().optional() }),
+  z.object({ slot: z.enum(['start_frame', 'video', 'dialogue']), shot_id: z.uuid(), choice: z.string().max(120).nullable().optional() }),
 ]);
 export type ProductionItem = z.infer<typeof ProductionItemSchema>;
 
 export const ProductionPlanRequestSchema = z.object({ project_id: z.uuid() });
+
+export const VoicesListRequestSchema = z.object({ project_id: z.uuid() });
 
 export const ProductionStartRequestSchema = z.object({
   project_id: z.uuid(),

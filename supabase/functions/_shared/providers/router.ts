@@ -5,7 +5,9 @@
 import type { Capability, ModelInfo } from './types.ts';
 
 export interface Need {
-  slot: 'reference' | 'start_frame' | 'video';
+  slot: 'reference' | 'start_frame' | 'video' | 'dialogue';
+  // Video: shottet har en godkendt replik, som munden skal følge.
+  speech?: boolean;
   durationSeconds?: number;
   movement?: string;
   referenceImages: number;
@@ -25,8 +27,15 @@ const MOVEMENT_LABEL: Record<string, string> = {
   static: 'statisk kamera', pan: 'panorering', tilt: 'tilt', handheld: 'håndholdt kamera', dolly: 'dolly', optical_zoom: 'optisk zoom',
 };
 
+const WHY_NOT: Record<Capability, string> = {
+  text_to_image: 'kan ikke lave billeder', image_to_image: 'kan ikke lave billeder', image_to_video: 'kan ikke lave video fra en startframe',
+  text_to_video: 'kan ikke lave video', text_to_speech: 'kan ikke lave tale', speech_to_video: 'kan ikke lave talende video',
+};
+
 function capabilityFor(need: Need): Capability {
-  return need.slot === 'video' ? 'image_to_video' : 'text_to_image';
+  if (need.slot === 'dialogue') return 'text_to_speech';
+  if (need.slot === 'video') return need.speech ? 'speech_to_video' : 'image_to_video';
+  return 'text_to_image';
 }
 
 export function recommend(
@@ -40,11 +49,11 @@ export function recommend(
   for (const m of models) {
     let why: string | null = null;
     if (m.simulated && !opts.allowSimulated) why = 'simulator — kun til udvikling';
-    else if (!m.capabilities.includes(cap)) why = cap === 'image_to_video' ? 'kan ikke lave video fra en startframe' : 'kan ikke lave billeder';
+    else if (!m.capabilities.includes(cap)) why = WHY_NOT[cap];
     else if (need.durationSeconds && m.maxSeconds && need.durationSeconds > m.maxSeconds) why = `højst ${m.maxSeconds} sek.`;
     else if (need.durationSeconds && m.minSeconds && need.durationSeconds < m.minSeconds) why = `mindst ${m.minSeconds} sek.`;
     else if (need.movement && m.movements && !m.movements.includes(need.movement)) why = `understøtter ikke ${MOVEMENT_LABEL[need.movement] ?? need.movement}`;
-    else if (need.referenceImages > m.maxReferenceImages) why = `tager højst ${m.maxReferenceImages} referencebilleder`;
+    else if (need.slot !== 'dialogue' && need.referenceImages > m.maxReferenceImages) why = `tager højst ${m.maxReferenceImages} referencebilleder`;
     if (why) excluded.push({ model: m, why });
     else candidates.push(m);
   }
@@ -54,7 +63,10 @@ export function recommend(
   const pick = chosen ?? candidates[0] ?? null;
   const fallback = candidates.find((m) => m !== pick && m.provider !== pick?.provider) ?? candidates.find((m) => m !== pick) ?? null;
   const reasons: string[] = [];
-  if (need.slot === 'video') {
+  if (need.slot === 'dialogue') {
+    reasons.push('dansk tale med karakterens faste stemme');
+  } else if (need.slot === 'video') {
+    if (need.speech) reasons.push('munden følger den godkendte replik');
     reasons.push('image-to-video fra den godkendte startframe');
     if (need.durationSeconds) reasons.push(`${need.durationSeconds} sek.`);
     if (need.movement) reasons.push(`${MOVEMENT_LABEL[need.movement] ?? need.movement} understøttes`);

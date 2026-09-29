@@ -86,8 +86,9 @@ function Instruction({ d, shot }: { d: FilmData; shot: ShotRow }) {
   const [f, setF] = useState({
     action: shot.action, dialogue: shot.dialogue ?? '', notes: shot.notes ?? '', duration_seconds: Number(shot.duration_seconds),
     shot_type: shot.shot_type, lens_mm: shot.lens_mm ? String(shot.lens_mm) : '', movement: shot.movement,
-    performance: shot.performance ?? '', lighting: shot.lighting ?? '',
+    performance: shot.performance ?? '', lighting: shot.lighting ?? '', speaker_asset_id: shot.speaker_asset_id ?? '',
   });
+  const characters = assetsFor(d, shot).filter((a) => a.kind === 'character');
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
   const locked = d.storyboard?.status !== 'approved' && d.storyboard?.status !== 'pending_approval';
   async function save(e: FormEvent) {
@@ -96,11 +97,12 @@ function Instruction({ d, shot }: { d: FilmData; shot: ShotRow }) {
     const next: Record<string, unknown> = {
       action: f.action.trim(), dialogue: nul(f.dialogue), notes: nul(f.notes), duration_seconds: f.duration_seconds,
       shot_type: f.shot_type, lens_mm: f.lens_mm ? Number(f.lens_mm) : null, movement: f.movement,
-      performance: nul(f.performance), lighting: nul(f.lighting),
+      performance: nul(f.performance), lighting: nul(f.lighting), speaker_asset_id: f.speaker_asset_id || null,
     };
     const before: Record<string, unknown> = {
       action: shot.action, dialogue: shot.dialogue, notes: shot.notes, duration_seconds: Number(shot.duration_seconds),
       shot_type: shot.shot_type, lens_mm: shot.lens_mm, movement: shot.movement, performance: shot.performance, lighting: shot.lighting,
+      speaker_asset_id: shot.speaker_asset_id,
     };
     const changes = Object.fromEntries(Object.entries(next).filter(([k, v]) => v !== before[k]));
     if (!Object.keys(changes).length) return flash('Der er ingen ændringer at gemme.', 'info');
@@ -114,7 +116,13 @@ function Instruction({ d, shot }: { d: FilmData; shot: ShotRow }) {
       </div>
       <fieldset className="form full" disabled={locked || !!busy}>
         <label className="field full">Handling<textarea rows={4} required maxLength={800} value={f.action} onChange={(e) => set('action', e.target.value)} /></label>
-        <label className="field full">Replik <span className="hint">valgfrit</span><input maxLength={800} value={f.dialogue} onChange={(e) => set('dialogue', e.target.value)} /></label>
+        <label className="field">Replik <span className="hint">dansk tale, valgfrit</span><input maxLength={800} value={f.dialogue} onChange={(e) => set('dialogue', e.target.value)} /></label>
+        <label className="field">Hvem siger den?
+          <select value={f.speaker_asset_id} onChange={(e) => set('speaker_asset_id', e.target.value)} disabled={!f.dialogue.trim() || !characters.length}>
+            <option value="">{characters.length ? `Automatisk (${characters[0]!.name})` : 'Ingen karakterer i shottet'}</option>
+            {characters.map((a) => <option key={a.id} value={a.id}>{a.name}{a.voice_name ? ` · ${a.voice_name}` : ' · mangler stemme'}</option>)}
+          </select>
+        </label>
         <label className="field">Shot-type<select value={f.shot_type} onChange={(e) => set('shot_type', e.target.value)}>{Object.entries(texts.shotTypes).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
         <label className="field">Kamerabevægelse<select value={f.movement} onChange={(e) => set('movement', e.target.value)}>{Object.entries(texts.movements).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
         <label className="field">Længde <span className="hint">sekunder</span><input type="number" min={1} max={15} step={0.5} value={f.duration_seconds} onChange={(e) => set('duration_seconds', Number(e.target.value))} /></label>
@@ -274,25 +282,31 @@ function Results({ d, shot, p, choice }: { d: FilmData; shot: ShotRow; p?: ShotP
   const pkgs = allPackages(d);
   return (
     <div className="stack">
-      {(['start_frame', 'video'] as const).map((slot) => {
+      {(p?.dialogue ? ['start_frame', 'dialogue', 'video'] as const : ['start_frame', 'video'] as const).map((slot) => {
         const gens = d.generations.filter((g) => g.shot_id === shot.id && g.slot === slot);
         const pkg = pkgs.find((x) => x.slot === slot && x.shotId === shot.id);
         const id = `${shot.id}:${slot}`;
-        const status = p ? (slot === 'start_frame' ? p.frame.status : p.video.status) : 'draft';
-        const gates = p ? (slot === 'start_frame' ? p.gates.frame : p.gates.video) : [];
-        const approvedId = slot === 'start_frame' ? shot.approved_start_frame_id : shot.approved_video_id;
+        const status = p ? (slot === 'start_frame' ? p.frame.status : slot === 'dialogue' ? p.dialogue!.status : p.video.status) : 'draft';
+        const gates = p ? (slot === 'start_frame' ? p.gates.frame : slot === 'dialogue' ? p.gates.dialogue : p.gates.video) : [];
+        const approvedId = slot === 'start_frame' ? shot.approved_start_frame_id : slot === 'dialogue' ? shot.approved_dialogue_id : shot.approved_video_id;
+        const picked = slot === 'dialogue' ? null : choice[slot];
+        const title = slot === 'start_frame' ? 'Startframe' : slot === 'dialogue' ? 'Replik (dansk tale)' : p?.dialogue ? 'Video med tale' : 'Video';
+        const approvedText = slot === 'dialogue' ? 'Replikken er godkendt. Videoen kan nu laves, så munden følger den.' : `${slot === 'video' ? 'Videoen' : 'Startframen'} er godkendt.`;
         return (
           <div key={slot} className="card">
             <div className="row between">
-              <h2>{slot === 'start_frame' ? 'Startframe' : 'Video'}</h2>
+              <h2>{title}</h2>
               <StatusPill status={status} />
             </div>
+            {slot === 'dialogue' && p?.speaker && (
+              <p className="small"><em>“{p.prompts.dialogue?.text}”</em> <span className="muted">— {p.speaker.name}{p.speaker.voiceName ? ` · stemme: ${p.speaker.voiceName}` : ''}</span></p>
+            )}
             {pkg ? (
               <div className="row between genbar">
-                <span className="small">{choice[slot] ? 'Dit valg' : pkg.pick?.label}{pkg.fallback ? <span className="muted"> · reserve klar</span> : null}</span>
+                <span className="small">{picked ? 'Dit valg' : pkg.pick?.label}{pkg.fallback ? <span className="muted"> · reserve klar</span> : null}</span>
                 <div className="row">
                   {repriced[id] !== undefined && <span className="small warn">Ny pris: {kr(repriced[id])}</span>}
-                  <Button kind="primary" small disabled={!!busy} onClick={() => start(id, { slot, shot_id: shot.id, choice: choice[slot] }, pkg.costCents)}>
+                  <Button kind="primary" small disabled={!!busy} onClick={() => start(id, { slot, shot_id: shot.id, choice: picked }, pkg.costCents)}>
                     {gens.length ? 'Generér ny version' : 'Generér'} · {kr(repriced[id] ?? pkg.costCents)}
                   </Button>
                 </div>
@@ -301,8 +315,8 @@ function Results({ d, shot, p, choice }: { d: FilmData; shot: ShotRow; p?: ShotP
               <ul className="checks">{gates.filter((g) => !g.ok).map((g) => <li key={g.text} className="no">{g.text}</li>)}</ul>
             ) : null}
             <GenList d={d} gens={gens} approvedId={approvedId} busy={!!review.busy || !!busy}
-              onReview={(g, dec) => review.run(g.id, () => api.review(g.id, dec), dec === 'approved' ? `${slot === 'video' ? 'Videoen' : 'Startframen'} er godkendt.` : 'Resultatet er afvist.')}
-              onRetry={pkg ? () => start(id, { slot, shot_id: shot.id, choice: choice[slot] }, pkg.costCents) : undefined} />
+              onReview={(g, dec) => review.run(g.id, () => api.review(g.id, dec), dec === 'approved' ? approvedText : 'Resultatet er afvist.')}
+              onRetry={pkg ? () => start(id, { slot, shot_id: shot.id, choice: picked }, pkg.costCents) : undefined} />
           </div>
         );
       })}
@@ -347,7 +361,7 @@ export function AttemptTable({ d, gens }: { d: FilmData; gens: GenerationRow[] }
   const seconds = (a: { started_at: string | null; finished_at: string | null }) =>
     a.started_at && a.finished_at ? `${Math.round((new Date(a.finished_at).getTime() - new Date(a.started_at).getTime()) / 1000)} sek.` : a.started_at ? 'kører' : '—';
   const STATUS: Record<string, string> = { waiting: 'I kø', submitted: 'Sendt', running: 'Genererer', succeeded: 'Færdig', failed: 'Fejlet', cancelled: 'Stoppet' };
-  const TYPE: Record<string, string> = { reference: 'Reference', start_frame: 'Startframe', video: 'Video' };
+  const TYPE: Record<string, string> = { reference: 'Reference', start_frame: 'Startframe', video: 'Video', dialogue: 'Replik' };
   return (
     <div className="tablewrap">
       <table className="table">

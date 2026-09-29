@@ -15,6 +15,7 @@ function shot(duration: number) {
     lighting: null,
     audio: null,
     asset_keys: ['hovedperson', 'koekken', 'hovedperson'],
+    speaker_key: null,
   };
 }
 
@@ -100,7 +101,7 @@ describe('flattenShots', () => {
 describe('objektiv uden for databasens grænser', () => {
   it('udelades i stedet for at afvise storyboardet', async () => {
     const { flattenShots } = await import('../../supabase/functions/_shared/storyboard.ts');
-    const shot = { duration_seconds: 3, shot_type: 'wide' as const, movement: 'static' as const, camera: 'k', action: 'a', dialogue: null, performance: null, lighting: null, audio: null, asset_keys: ['x'] };
+    const shot = { duration_seconds: 3, shot_type: 'wide' as const, movement: 'static' as const, camera: 'k', action: 'a', dialogue: null, performance: null, lighting: null, audio: null, asset_keys: ['x'], speaker_key: null };
     const flat = flattenShots({ assets: [], scenes: [{ heading: 'h', purpose: 'p', shots: [{ ...shot, lens_mm: 4 }, { ...shot, lens_mm: 50 }, { ...shot, lens_mm: 1200 }] }] });
     expect(flat.map((s) => s.lens_mm)).toEqual([null, 50, null]);
   });

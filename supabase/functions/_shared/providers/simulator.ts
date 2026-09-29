@@ -13,6 +13,8 @@ export const SIMULATOR_MODELS: ModelInfo[] = [
   { provider: 'simulator', model: 'image-hq', label: 'Simuleret billedmodel (kvalitet)', capabilities: ['text_to_image', 'image_to_image'], maxReferenceImages: 8, priceCents: 700, quality: 3, simulated: true },
   { provider: 'simulator-b', model: 'image-fast', label: 'Simuleret billedmodel (hurtig)', capabilities: ['text_to_image'], maxReferenceImages: 2, priceCents: 600, quality: 2, simulated: true },
   { provider: 'simulator', model: 'video-a', label: 'Simuleret videomodel A', capabilities: ['image_to_video'], maxReferenceImages: 4, minSeconds: 3, maxSeconds: 10, movements: ['static', 'pan', 'tilt', 'handheld', 'dolly', 'optical_zoom'], priceCents: 2800, quality: 3, simulated: true },
+  { provider: 'simulator', model: 'speak', label: 'Simuleret talende video', capabilities: ['speech_to_video'], maxReferenceImages: 1, minSeconds: 1, maxSeconds: 15, priceCents: 900, quality: 3, simulated: true },
+  { provider: 'simulator', model: 'tts', label: 'Simuleret stemme', capabilities: ['text_to_speech'], maxReferenceImages: 0, priceCents: 100, quality: 3, simulated: true },
   { provider: 'simulator-b', model: 'video-b', label: 'Simuleret videomodel B', capabilities: ['image_to_video'], maxReferenceImages: 2, minSeconds: 3, maxSeconds: 8, movements: ['static', 'pan', 'handheld'], priceCents: 2200, quality: 2, simulated: true },
 ];
 
@@ -42,7 +44,26 @@ export function createSimulator(id: 'simulator' | 'simulator-b', now: () => numb
     async cancel() {
       return true;
     },
+    // Tale svarer med det samme: et sekunds stilhed pr. ord, højst 15 sek.
+    async run(_model, req) {
+      if (!req.voiceId) throw new Error('replikken har ingen stemme');
+      return { bytes: silentWav(Math.min(15, Math.max(1, req.prompt.split(/\s+/).length * 0.4))), mime: 'audio/wav' };
+    },
   };
+}
+
+// Stille WAV (8 kHz, 8 bit, mono) som pladsholder for simuleret tale.
+export function silentWav(seconds: number): Uint8Array {
+  const rate = 8000;
+  const n = Math.round(rate * seconds);
+  const buf = new Uint8Array(44 + n);
+  const v = new DataView(buf.buffer);
+  const str = (o: number, t: string) => [...t].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVE'); str(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true);
+  v.setUint32(28, rate, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); str(36, 'data'); v.setUint32(40, n, true);
+  buf.fill(128, 44);
+  return buf;
 }
 
 // Pladsholder-fil, der gemmes i Storage for et simuleret resultat.

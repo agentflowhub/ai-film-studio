@@ -27,11 +27,11 @@ interface Gen {
   id: string;
   org_id: string;
   project_id: string;
-  slot: 'reference' | 'start_frame' | 'video';
+  slot: 'reference' | 'start_frame' | 'video' | 'dialogue';
   shot_id: string | null;
   asset_version_id: string | null;
   version: number;
-  input: { prompt: string; pick: { provider: string; model: string } | null; fallback: { provider: string; model: string } | null };
+  input: { prompt: string; pick: { provider: string; model: string } | null; fallback: { provider: string; model: string } | null; voice_id?: string };
   cost_estimate_cents: number;
 }
 interface Attempt {
@@ -56,6 +56,8 @@ async function signedUrls(admin: Admin, paths: string[]): Promise<string[]> {
 
 async function buildRequest(admin: Admin, g: Gen): Promise<GenerationRequest> {
   const req: GenerationRequest = { prompt: g.input.prompt, referenceUrls: [], aspectRatio: '16:9' };
+  // Replik: selve teksten og talerens stemme — intet billede.
+  if (g.slot === 'dialogue') return { ...req, voiceId: g.input.voice_id };
   if (g.slot === 'reference') {
     const refs = await admin.from('asset_references').select('media(storage_path)').eq('asset_version_id', g.asset_version_id!);
     if (refs.error) throw refs.error;
@@ -64,7 +66,7 @@ async function buildRequest(admin: Admin, g: Gen): Promise<GenerationRequest> {
   }
   const shot = await admin
     .from('shots')
-    .select('duration_seconds, approved_start_frame_id, shot_assets(asset_versions(asset_references(is_primary, media(storage_path))))')
+    .select('duration_seconds, approved_start_frame_id, approved_dialogue_id, shot_assets(asset_versions(asset_references(is_primary, media(storage_path))))')
     .eq('id', g.shot_id!)
     .single();
   if (shot.error) throw shot.error;
@@ -76,6 +78,12 @@ async function buildRequest(admin: Admin, g: Gen): Promise<GenerationRequest> {
     const frame = await admin.from('generations').select('media:output_media_id(storage_path)').eq('id', shot.data.approved_start_frame_id as string).single();
     if (frame.error) throw frame.error;
     [req.startFrameUrl] = await signedUrls(admin, [(frame.data.media as unknown as { storage_path: string }).storage_path]);
+    // Talende video: munden skal følge den godkendte replik.
+    if (shot.data.approved_dialogue_id) {
+      const line = await admin.from('generations').select('media:output_media_id(storage_path)').eq('id', shot.data.approved_dialogue_id as string).single();
+      if (line.error) throw line.error;
+      [req.audioUrl] = await signedUrls(admin, [(line.data.media as unknown as { storage_path: string }).storage_path]);
+    }
   }
   return req;
 }
@@ -110,7 +118,15 @@ async function submitAttempt(admin: Admin, registry: Registry, g: Gen, attemptNo
     failure = { reason: 'provideren er ikke tilgængelig', confirmed: true };
   } else {
     try {
-      ({ providerJobId } = await adapter.submit(target.model, await buildRequest(admin, g), `${g.id}:${attemptNo}`));
+      const request = await buildRequest(admin, g);
+      if (g.slot === 'dialogue' && adapter.run) {
+        // Tale svarer med det samme: gem lyden og afslut uden et job, der skal følges.
+        const file = await adapter.run(target.model, request, `${g.id}:${attemptNo}`);
+        await admin.from('generation_attempts').update({ status: 'running', started_at: new Date().toISOString() }).eq('id', ins.data.id);
+        await finishSuccess(admin, registry, g, { id: ins.data.id, attempt: attemptNo, provider: target.provider, model: target.model }, file);
+        return;
+      }
+      ({ providerJobId } = await adapter.submit(target.model, request, `${g.id}:${attemptNo}`));
     } catch (err) {
       // Afvist før oprettelse = intet job. Alt andet kan have oprettet et job,
       // vi ikke kender — så er stoppet ikke bekræftet, og reserven prøves ikke.
@@ -138,10 +154,14 @@ async function submitAttempt(admin: Admin, registry: Registry, g: Gen, attemptNo
   log('info', 'generation.submitted', { generation_id: g.id, attempt: attemptNo, provider: target.provider });
 }
 
-async function storeResult(admin: Admin, g: Gen, file: { url: string; mime: string }, label: string): Promise<string> {
+type ResultFile = { url: string; mime: string } | { bytes: Uint8Array; mime: string };
+
+async function storeResult(admin: Admin, g: Gen, file: ResultFile, label: string): Promise<string> {
   let bytes: Uint8Array;
   let mime = file.mime;
-  if (file.url.startsWith('simulated://')) {
+  if ('bytes' in file) {
+    bytes = file.bytes;
+  } else if (file.url.startsWith('simulated://')) {
     const f = simulatedFile(label, g.slot === 'video');
     bytes = f.bytes;
     mime = f.mime;
@@ -151,7 +171,8 @@ async function storeResult(admin: Admin, g: Gen, file: { url: string; mime: stri
     bytes = new Uint8Array(await res.arrayBuffer());
     if (bytes.byteLength > MAX_FILE_BYTES) throw new Error('resultatet er for stort');
   }
-  const ext = mime === 'video/mp4' ? 'mp4' : mime === 'image/svg+xml' ? 'svg' : mime === 'image/jpeg' ? 'jpg' : mime === 'image/webp' ? 'webp' : 'png';
+  const EXT: Record<string, string> = { 'video/mp4': 'mp4', 'image/svg+xml': 'svg', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'audio/wav': 'wav', 'audio/mpeg': 'mp3' };
+  const ext = EXT[mime] ?? 'png';
   const path = `${g.org_id}/${g.project_id}/${g.id}.${ext}`;
   const up = await admin.storage.from('media').upload(path, bytes, { contentType: mime, upsert: true });
   if (up.error) throw up.error;
@@ -161,13 +182,26 @@ async function storeResult(admin: Admin, g: Gen, file: { url: string; mime: stri
     .from('media')
     .insert({
       org_id: g.org_id, project_id: g.project_id, storage_path: path,
-      kind: mime.startsWith('video/') ? 'video' : 'image', mime, bytes: bytes.byteLength,
+      kind: mime.startsWith('video/') ? 'video' : mime.startsWith('audio/') ? 'audio' : 'image', mime, bytes: bytes.byteLength,
       sha256: await sha256Bytes(bytes), source: 'generation',
     })
     .select('id')
     .single();
   if (m.error) throw m.error;
   return m.data.id as string;
+}
+
+// Resultatet gemmes i Storage, genereringen venter på gennemsyn, og den faktiske
+// pris bogføres (reservationen frigives).
+async function finishSuccess(admin: Admin, registry: Registry, g: Gen, a: { id: string; attempt: number; provider: string; model: string }, file: ResultFile): Promise<void> {
+  const model = registry.models.find((m) => m.provider === a.provider && m.model === a.model);
+  const actual = Math.min(model?.priceCents ?? g.cost_estimate_cents, g.cost_estimate_cents);
+  const mediaId = await storeResult(admin, g, file, `${g.slot} v${g.version}`);
+  await admin.from('generation_attempts').update({ status: 'succeeded', finished_at: new Date().toISOString() }).eq('id', a.id);
+  const done = await admin.from('generations').update({ status: 'succeeded', output_media_id: mediaId, review: 'pending', cost_actual_cents: actual }).eq('id', g.id);
+  if (done.error) throw done.error;
+  await admin.rpc('settle_budget', { target_project: g.project_id, reserved: g.cost_estimate_cents, actual });
+  log('info', 'generation.succeeded', { generation_id: g.id, attempt: a.attempt, cost_cents: actual });
 }
 
 async function startQueued(admin: Admin, registry: Registry): Promise<number> {
@@ -215,14 +249,7 @@ async function pollActive(admin: Admin, registry: Registry): Promise<number> {
     }
     n++;
     if (decision.do === 'succeed') {
-      const model = registry.models.find((m) => m.provider === a.provider && m.model === a.model);
-      const actual = Math.min(model?.priceCents ?? g.cost_estimate_cents, g.cost_estimate_cents);
-      const mediaId = await storeResult(admin, g, decision.files[0]!, `${g.slot} v${g.version}`);
-      await admin.from('generation_attempts').update({ status: 'succeeded', finished_at: now }).eq('id', a.id);
-      const done = await admin.from('generations').update({ status: 'succeeded', output_media_id: mediaId, review: 'pending', cost_actual_cents: actual }).eq('id', g.id);
-      if (done.error) throw done.error;
-      await admin.rpc('settle_budget', { target_project: g.project_id, reserved: g.cost_estimate_cents, actual });
-      log('info', 'generation.succeeded', { generation_id: g.id, attempt: a.attempt, cost_cents: actual });
+      await finishSuccess(admin, registry, g, a, decision.files[0]!);
       continue;
     }
 

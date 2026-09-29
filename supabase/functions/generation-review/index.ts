@@ -4,6 +4,7 @@
 // bliver en startframe, en video eller et sæt master-referencer brugbart:
 //   * startframe → shottets godkendte startframe
 //   * video      → shottets godkendte video
+//   * dialogue   → shottets godkendte replik (dansk tale), som videoen bygger på
 //   * reference  → aktiv-versionen godkendes og bliver master, hvis aktivet ikke har en
 // Databasen afviser alt andet (shot_approved_outputs_valid,
 // asset_version_requires_reviewed_reference).
@@ -36,8 +37,8 @@ serve('generation-review', GenerationReviewRequestSchema, async ({ admin, userId
   if (!reviewed.data) return apiError('approval_conflict', 409);
 
   if (body.decision === 'approved') {
-    if (g.data.slot === 'start_frame' || g.data.slot === 'video') {
-      const field = g.data.slot === 'start_frame' ? 'approved_start_frame_id' : 'approved_video_id';
+    if (g.data.slot === 'start_frame' || g.data.slot === 'video' || g.data.slot === 'dialogue') {
+      const field = g.data.slot === 'start_frame' ? 'approved_start_frame_id' : g.data.slot === 'dialogue' ? 'approved_dialogue_id' : 'approved_video_id';
       const upd = await admin.from('shots').update({ [field]: g.data.id }).eq('id', g.data.shot_id as string);
       if (upd.error) throw upd.error;
     } else {

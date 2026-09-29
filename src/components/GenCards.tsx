@@ -72,7 +72,9 @@ export function GenCard({ d, g, approved, busy, onReview, onRetry, label }: {
   const title = `${label ? `${label} · ` : ''}v${g.version}`;
   return (
     <figure className={`gencard ${approved ? 'chosen' : ''}`}>
-      {url ? (
+      {url && g.media?.mime.startsWith('audio/') ? (
+        <div className="audiobox"><span aria-hidden="true">🗣</span><audio src={url} controls preload="metadata" aria-label={title} /></div>
+      ) : url ? (
         <button type="button" className="zoom" onClick={() => setOpen(true)} aria-label={`Vis ${title} i stor størrelse`}>
           <Thumb url={url} mime={g.media?.mime} alt={title} />
         </button>
@@ -95,7 +97,7 @@ export function GenCard({ d, g, approved, busy, onReview, onRetry, label }: {
         )}
         {state === 'failed' && onRetry && <Button small disabled={busy} onClick={onRetry}>Prøv igen</Button>}
       </figcaption>
-      {open && url && (
+      {open && url && !g.media?.mime.startsWith('audio/') && (
         <Lightbox url={url} mime={g.media?.mime} title={title} busy={busy} onClose={() => setOpen(false)} onReview={state === 'needs_approval' ? onReview : undefined} />
       )}
     </figure>

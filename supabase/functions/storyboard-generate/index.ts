@@ -159,7 +159,10 @@ serve('storyboard-generate', StoryboardGenerateRequestSchema, async ({ admin, us
       const flat = flattenShots(fitted.draft);
       const insertedShots = await admin
         .from('shots')
-        .insert(flat.map(({ asset_keys: _keys, ...shot }) => ({ ...shot, org_id: orgId, storyboard_id: storyboard.data.id })))
+        .insert(flat.map(({ asset_keys: _keys, speaker_key, ...shot }) => {
+          const speaker = speaker_key ? byKey.get(speaker_key) : undefined;
+          return { ...shot, speaker_asset_id: speaker?.kind === 'character' ? speaker.assetId : null, org_id: orgId, storyboard_id: storyboard.data.id };
+        }))
         .select('id, code');
       if (insertedShots.error) throw step('shots', insertedShots.error);
       const shotIdByCode = new Map(insertedShots.data.map((r) => [r.code as string, r.id as string]));
