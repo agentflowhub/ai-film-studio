@@ -2,7 +2,7 @@
 // billede og lyd i præcis samme længde, så samlingen ikke hakker.
 
 import { describe, expect, it } from 'vitest';
-import { clipArgs, clipSeconds, concatList, durationOf, fileName, finalArgs, fpsOf, frameCount, hasAudioStream } from '../../src/lib/filmExport.ts';
+import { captionChunks, clipArgs, clipSeconds, concatList, DUCK_VOLUME, durationOf, fileName, finalArgs, fpsOf, frameCount, hasAudioStream, timeline } from '../../src/lib/filmExport.ts';
 
 const after = (args: string[], flag: string) => args[args.indexOf(flag) + 1]!;
 const opts = { hasAudio: true, seconds: 5, fps: 24, transition: 'cut' as const };
@@ -45,7 +45,56 @@ describe('mellemklip', () => {
     expect(a.slice(0, 6)).toEqual(['-f', 'concat', '-safe', '0', '-i', 'list.txt']);
     expect([after(a, '-r'), after(a, '-c:v'), after(a, '-c:a')]).toEqual(['25', 'libx264', 'aac']);
     expect(a).not.toContain('copy');
-    expect([after(a, '-vf'), after(a, '-af')]).toEqual(['setpts=N/FRAME_RATE/TB', 'asetpts=N/SR/TB']);
+    const graph = after(a, '-filter_complex');
+    expect(graph).toContain('[0:v]setpts=N/FRAME_RATE/TB[v0]');
+    expect(graph).toContain('[0:a]asetpts=N/SR/TB[a0]');
+    expect([after(a, '-map'), a[a.lastIndexOf('-map') + 1]]).toEqual(['[v0]', '[a0]']);
+  });
+});
+
+describe('voiceover og tekst i samlingen', () => {
+  const voices = [{ file: 'line2.wav', start: 6.5, end: 11 }];
+  const overlays = [{ file: 't0.png', start: 0, end: 3.5 }, { file: 't1.png', start: 6.5, end: 8 }];
+  const a = finalArgs('list.txt', 'film.mp4', 24, voices, overlays);
+  const graph = after(a, '-filter_complex');
+
+  it('voiceoveren lægges ind fra sit shot og blandes med klippenes lyd', () => {
+    expect(a.filter((x) => x === '-i')).toHaveLength(4);
+    expect(graph).toContain('[1:a]aresample=48000,aformat=sample_rates=48000:channel_layouts=stereo,adelay=6500|6500[vo0]');
+    expect(graph).toContain('[a0][vo0]amix=inputs=2:duration=first:normalize=0[a]');
+    expect(a[a.lastIndexOf('-map') + 1]).toBe('[a]');
+  });
+
+  it('klippenes egen lyd dæmpes, mens voiceoveren taler', () => {
+    expect(graph).toContain(`volume='if(between(t,6.500,11.000),${DUCK_VOLUME},1)':eval=frame`);
+  });
+
+  it('hvert tekstbillede vises kun i sit vindue', () => {
+    expect(graph).toContain("[v0][2:v]overlay=0:0:eof_action=repeat:enable='between(t,0.000,3.500)'[v1]");
+    expect(graph).toContain("[v1][3:v]overlay=0:0:eof_action=repeat:enable='between(t,6.500,8.000)'[v2]");
+    expect(after(a, '-map')).toBe('[v2]');
+  });
+});
+
+describe('tekst på replikker', () => {
+  it('deles i stykker på højst to linjer, timet efter antal tegn', () => {
+    const c = captionChunks('Mit navn er Sander Andersen. Og jeg er autoriseret Ole Lukøje, som det jo så fancy hedder på internationalsk.', 6);
+    expect(c.length).toBeGreaterThan(1);
+    expect(c.every((x) => x.text.length <= 76)).toBe(true);
+    expect(c[0]!.text).toBe('Mit navn er Sander Andersen.');
+    expect(c[0]!.start).toBe(0);
+    expect(c.at(-1)!.end).toBeCloseTo(6);
+  });
+
+  it('tom replik eller ingen tid giver ingen tekst', () => {
+    expect(captionChunks('  ', 3)).toEqual([]);
+    expect(captionChunks('Hej', 0)).toEqual([]);
+  });
+});
+
+describe('tidslinje', () => {
+  it('shots ligger efter hinanden i hele billeder', () => {
+    expect(timeline([2, 1.01, 3], 24).map((t) => [t.start, Number(t.end.toFixed(4))])).toEqual([[0, 2], [2, 3], [3, 6]]);
   });
 });
 

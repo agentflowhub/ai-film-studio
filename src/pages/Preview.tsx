@@ -1,12 +1,14 @@
 // Preview: filmen afspillet shot for shot i storyboardets rækkefølge. Godkendt
-// video, hvis den findes — ellers startframen i shottets længde.
+// video, hvis den findes — ellers startframen i shottets længde. En godkendt
+// voiceover afspilles fra sit shot og fortsætter hen over de næste.
 
 import { useEffect, useRef, useState } from 'react';
 import { FilmHeader } from '../components/Shell.tsx';
 import { Button, Empty, Notice, Progress, StatusPill, Thumb } from '../components/ui.tsx';
 import { outputFor, useFilm, type FilmData } from '../lib/data.ts';
 import { flash } from '../lib/flash.ts';
-import { download, exportFilm, fileName, type ExportPart, type Transition } from '../lib/filmExport.ts';
+import { download, exportFilm, fileName, type ExportLine, type ExportPart, type Transition } from '../lib/filmExport.ts';
+import { renderCard } from '../lib/textCards.ts';
 import { planFor, timecodes } from '../lib/derive.ts';
 import { shotState, tc } from '../lib/shotState.ts';
 
@@ -29,6 +31,20 @@ export function Preview({ filmId }: { filmId: string }) {
   useEffect(() => {
     if (playing && isVideo) void video.current?.play().catch(() => setPlaying(false));
   }, [playing, isVideo, i]);
+  // Voiceover: starter med sit shot og får lov at tale færdig hen over de næste.
+  const voice = useRef<HTMLAudioElement | null>(null);
+  const line = data && shot ? lineFor(data, shot) : null;
+  const voUrl = line?.mode === 'voiceover' ? line.url : null;
+  useEffect(() => {
+    if (!playing || !voUrl) return;
+    voice.current?.pause();
+    voice.current = new Audio(voUrl);
+    void voice.current.play().catch(() => undefined);
+  }, [playing, voUrl, i]);
+  useEffect(() => {
+    if (!playing) voice.current?.pause();
+  }, [playing]);
+  useEffect(() => () => voice.current?.pause(), []);
 
   if (!data) return null;
   if (!shots.length || !shot) return (<><FilmHeader route={{ name: 'preview', filmId }} /><Empty title="Intet at vise endnu"><p className="muted">Preview bliver mulig, når storyboardet findes.</p></Empty></>);
@@ -70,28 +86,47 @@ export function Preview({ filmId }: { filmId: string }) {
   );
 }
 
-// Et shot i den samlede film: det, Preview viser.
+// Shottets godkendte replik: lyden, ordene og hvordan den høres.
+function lineFor(d: FilmData, s: FilmData['shots'][number]): ExportLine | null {
+  const g = s.approved_dialogue_id ? d.generations.find((x) => x.id === s.approved_dialogue_id) : undefined;
+  const url = g?.media ? d.urls[g.media.storage_path] : null;
+  if (!url || !s.dialogue?.trim()) return null;
+  return { url, text: s.dialogue.trim(), mode: s.dialogue_mode === 'voiceover' ? 'voiceover' : 'on_camera' };
+}
+
+// Et shot i den samlede film: det, Preview viser. En talende replik (on_camera)
+// ligger allerede i videoen; kun en voiceover lægges på — men begge får tekst.
 function partFor(d: FilmData, s: FilmData['shots'][number]): ExportPart {
   const seconds = Number(s.duration_seconds);
+  const line = lineFor(d, s);
   const v = s.approved_video_id ? outputFor(d, s, 'video') : null;
-  if (v?.url && v.gen.media?.mime.startsWith('video/')) {
-    const line = s.approved_dialogue_id ? d.generations.find((g) => g.id === s.approved_dialogue_id) : undefined;
-    return { kind: 'video', url: v.url, seconds, speechUrl: line?.media ? d.urls[line.media.storage_path] ?? null : null };
-  }
+  if (v?.url && v.gen.media?.mime.startsWith('video/')) return { kind: 'video', url: v.url, seconds, line };
   const f = outputFor(d, s, 'start_frame');
-  return f?.url && f.gen.media?.mime.startsWith('image/') ? { kind: 'still', url: f.url, seconds } : { kind: 'black', seconds };
+  // Uden godkendt video er der ingen læbesynk; replikken høres så som voiceover.
+  const still = line ? { ...line, mode: 'voiceover' as const } : null;
+  return f?.url && f.gen.media?.mime.startsWith('image/') ? { kind: 'still', url: f.url, seconds, line: still } : { kind: 'black', seconds, line: still };
 }
 
 function SaveFilm({ d, done }: { d: FilmData; done: number }) {
   const [state, setState] = useState<{ share: number; step: string } | null>(null);
   const [failed, setFailed] = useState(false);
   const [transition, setTransition] = useState<Transition>('cut');
+  const [captions, setCaptions] = useState(true);
+  const [title, setTitle] = useState(d.project.title);
+  const [subtitle, setSubtitle] = useState('');
+  const [tagline, setTagline] = useState(d.storyboard?.tagline ?? '');
+  const [sender, setSender] = useState('');
   const total = d.shots.length;
+  const nul = (x: string) => x.trim() || null;
   async function save() {
     setFailed(false);
     setState({ share: 0, step: 'Forbereder …' });
     try {
-      const blob = await exportFilm(d.shots.map((s) => partFor(d, s)), transition, (share, step) => setState({ share, step }));
+      const blob = await exportFilm(
+        d.shots.map((s) => partFor(d, s)),
+        { transition, captions, title: nul(title), subtitle: nul(subtitle), tagline: nul(tagline), sender: nul(sender), render: renderCard },
+        (share, step) => setState({ share, step }),
+      );
       download(blob, fileName(d.project.title));
       flash('Filmen er gemt som MP4 i din Overførsler-mappe.');
     } catch (err) {
@@ -106,14 +141,23 @@ function SaveFilm({ d, done }: { d: FilmData; done: number }) {
       <div className="row between">
         <div>
           <h2>Gem filmen</h2>
-          <p className="muted small">Alle shots samles i storyboardets rækkefølge til én MP4-fil med lyd, hvert shot i den længde, storyboardet angiver — talende shots dog altid til replikken er sagt færdig. Det sker i din browser og koster ikke noget. Første gang henter browseren et videoværktøj på ca. 30 MB.</p>
+          <p className="muted small">Alle shots samles i storyboardets rækkefølge til én MP4-fil med lyd, hvert shot i den længde, storyboardet angiver — talende shots dog altid til replikken er sagt færdig. Voiceovers lægges over billedet og må fortsætte ind i de næste shots. Det sker i din browser og koster ikke noget. Første gang henter browseren et videoværktøj på ca. 30 MB.</p>
         </div>
-        <select value={transition} onChange={(e) => setTransition(e.target.value as Transition)} disabled={!!state} aria-label="Overgang mellem shots">
-          <option value="cut">Hårde klip</option>
-          <option value="soft">Bløde overgange</option>
-        </select>
         <Button kind="primary" disabled={!!state || !total} onClick={save}>{state ? 'Samler …' : 'Hent film (MP4)'}</Button>
       </div>
+      <fieldset className="form" disabled={!!state}>
+        <label className="field">Titel <span className="hint">over åbningsbilledet, tom = ingen</span><input maxLength={80} value={title} onChange={(e) => setTitle(e.target.value)} /></label>
+        <label className="field">Undertitel <span className="hint">valgfri</span><input maxLength={120} value={subtitle} onChange={(e) => setSubtitle(e.target.value)} /></label>
+        <label className="field">Slogan <span className="hint">over sidste billede og på slutskiltet</span><input maxLength={120} value={tagline} onChange={(e) => setTagline(e.target.value)} /></label>
+        <label className="field">Afsender <span className="hint">fx firmanavn på slutskiltet</span><input maxLength={60} value={sender} onChange={(e) => setSender(e.target.value)} /></label>
+        <label className="field">Overgang
+          <select value={transition} onChange={(e) => setTransition(e.target.value as Transition)}>
+            <option value="cut">Hårde klip</option>
+            <option value="soft">Bløde overgange</option>
+          </select>
+        </label>
+        <label className="field check"><input type="checkbox" checked={captions} onChange={(e) => setCaptions(e.target.checked)} /> Tekst på replikker</label>
+      </fieldset>
       {done < total && !state && <Notice tone="warn">{total - done} af {total} shots har ingen godkendt video endnu. De kommer med som startframe i shottets længde, eller som sort billede.</Notice>}
       {state && (
         <div className="stack">
