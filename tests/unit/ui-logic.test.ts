@@ -105,3 +105,13 @@ describe('opgaver, der går i stå', () => {
     expect(lastProblem([task('done', 1)], 'storyboard.generate', now)).toBeNull();
   });
 });
+
+describe('tjek før en video godkendes', () => {
+  it('ansigter ved personer; mund og taler ved replik', async () => {
+    const { videoChecks } = await import('../../src/lib/shotState.ts');
+    expect(videoChecks(null, false)).toEqual([]);
+    expect(videoChecks(null, true)).toEqual(['Ansigterne er de samme hele klippet og ligner rigtige mennesker']);
+    expect(videoChecks('Lone', true)).toHaveLength(3);
+    expect(videoChecks('Lone', true)[2]).toContain('Det er Lone, der taler');
+  });
+});

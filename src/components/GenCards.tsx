@@ -3,7 +3,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import type { FilmData } from '../lib/data.ts';
-import { kr } from '../lib/shotState.ts';
+import { kr, videoChecks } from '../lib/shotState.ts';
 import { texts } from '../lib/texts.ts';
 import type { GenerationRow } from '../lib/types.ts';
 import { Button, StatusPill, Thumb } from './ui.tsx';
@@ -56,15 +56,19 @@ export function ZoomThumb({ url, mime, alt, ratio, empty }: { url?: string | nul
   );
 }
 
-// En talende video godkendes først, når mennesket har set efter de to ting,
-// ingen model kan garantere: at munden følger lyden, og at det er den rigtige
-// person, der taler. Afkrydsningen gemmes ikke; den skal gøres pr. video.
-function SpeechCheck({ speaker, checks, onChange }: { speaker: string; checks: [boolean, boolean]; onChange: (c: [boolean, boolean]) => void }) {
+// En video med personer godkendes først, når mennesket har set efter det,
+// ingen model kan garantere: at ansigterne holder hele klippet — og i en
+// talende video, at munden følger lyden, og at det er den rigtige, der taler.
+// Afkrydsningen gemmes ikke; den skal gøres pr. video.
+function VideoCheck({ items, checked, onChange, withSound }: { items: string[]; checked: boolean[]; onChange: (c: boolean[]) => void; withSound: boolean }) {
   return (
     <fieldset className="speechcheck">
-      <legend className="small">Se videoen med lyd, før du godkender</legend>
-      <label className="small"><input type="checkbox" checked={checks[0]} onChange={(e) => onChange([e.target.checked, checks[1]])} /> Munden følger lyden hele vejen</label>
-      <label className="small"><input type="checkbox" checked={checks[1]} onChange={(e) => onChange([checks[0], e.target.checked])} /> Det er {speaker}, der taler, og ingen andre bevæger munden</label>
+      <legend className="small">{withSound ? 'Se videoen med lyd, før du godkender' : 'Se videoen, før du godkender'}</legend>
+      {items.map((text, i) => (
+        <label key={text} className="small">
+          <input type="checkbox" checked={!!checked[i]} onChange={(e) => onChange(items.map((_, j) => (j === i ? e.target.checked : !!checked[j])))} /> {text}
+        </label>
+      ))}
     </fieldset>
   );
 }
@@ -86,10 +90,13 @@ export function GenCard({ d, g, approved, busy, onReview, onRetry, label }: {
   const title = `${label ? `${label} · ` : ''}v${g.version}`;
   const plan = g.slot === 'video' ? d.plan?.shots.find((p) => p.shotId === g.shot_id) : undefined;
   const speaker = plan?.dialogue ? plan.speaker?.name ?? 'taleren' : null;
-  const [checks, setChecks] = useState<[boolean, boolean]>([false, false]);
-  const needsCheck = !!speaker && state === 'needs_approval';
-  const blocked = needsCheck && !(checks[0] && checks[1]);
-  const check = needsCheck ? <SpeechCheck speaker={speaker!} checks={checks} onChange={setChecks} /> : null;
+  const shot = g.slot === 'video' ? d.shots.find((s) => s.id === g.shot_id) : undefined;
+  const people = !!shot?.shot_assets.some((sa) => d.assets.find((a) => a.id === sa.asset_id)?.kind === 'character');
+  const items = g.slot === 'video' ? videoChecks(speaker, people) : [];
+  const [checked, setChecked] = useState<boolean[]>([]);
+  const needsCheck = items.length > 0 && state === 'needs_approval';
+  const blocked = needsCheck && !items.every((_, i) => checked[i]);
+  const check = needsCheck ? <VideoCheck items={items} checked={checked} onChange={setChecked} withSound={!!speaker} /> : null;
   return (
     <figure className={`gencard ${approved ? 'chosen' : ''}`}>
       {url && g.media?.mime.startsWith('audio/') ? (
@@ -112,7 +119,7 @@ export function GenCard({ d, g, approved, busy, onReview, onRetry, label }: {
         {check}
         {state === 'needs_approval' && (
           <div className="row">
-            <Button small kind="approve" disabled={busy || blocked} title={blocked ? 'Sæt begge flueben først' : undefined} onClick={() => onReview('approved')}>{texts.common.approve}</Button>
+            <Button small kind="approve" disabled={busy || blocked} title={blocked ? 'Sæt alle flueben først' : undefined} onClick={() => onReview('approved')}>{texts.common.approve}</Button>
             <Button small kind="reject" disabled={busy} onClick={() => onReview('rejected')}>{texts.common.reject}</Button>
           </div>
         )}

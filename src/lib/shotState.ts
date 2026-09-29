@@ -37,3 +37,11 @@ export function tc(sec: number): string {
 }
 
 export const kr = (cents: number) => `${Math.round(cents / 100).toLocaleString('da-DK')} kr.`;
+
+// Det, mennesket skal have set efter i en video, før den kan godkendes.
+export function videoChecks(speaker: string | null, people: boolean): string[] {
+  return [
+    ...(people ? ['Ansigterne er de samme hele klippet og ligner rigtige mennesker'] : []),
+    ...(speaker ? ['Munden følger lyden hele vejen', `Det er ${speaker}, der taler, og ingen andre bevæger munden`] : []),
+  ];
+}
