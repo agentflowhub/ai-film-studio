@@ -104,9 +104,10 @@ er endnu kørt mod et rigtigt Supabase-projekt eller rigtige API-nøgler.
 - OpenAI kaldes via Responses-API'et i baggrundstilstand med billedværktøjet,
   så et billede kan følges og stoppes som et job i stedet for at holde en
   Edge Function åben i minutter.
-- Higgsfield kan kun stoppe et job, mens det står i kø. Et job i gang kan ikke
-  stoppes, så en tidsudløbet video skifter aldrig til reserven (det kunne give
-  to betalte jobs); genereringen fejler i stedet, og et menneske tager stilling.
+- Higgsfield DoP og Speak bruger v1-protokollen (`{ params }` og
+  `/v1/job-sets/<id>`), som ikke har et stop-kald. Et job i gang regnes derfor
+  som ikke-stoppet: en tidsudløbet video skifter aldrig til reserven (det kunne
+  give to betalte jobs); genereringen fejler i stedet, og et menneske tager stilling.
 - Reserven kan være en anden model hos samme provider. Et nyt forsøg kræver
   stadig, at det forrige er bekræftet stoppet (databasens `attempt_failover_guard`).
 - **Dansk tale** (migration 004): en karakter får en fast stemme; et shot med

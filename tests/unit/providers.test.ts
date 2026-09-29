@@ -69,25 +69,32 @@ describe('OpenAI (ChatGPT Images)', () => {
   });
 });
 
-describe('Higgsfield', () => {
+describe('Higgsfield (v1-protokol: params og job-sets)', () => {
   const video: GenerationRequest = { ...req, startFrameUrl: 'https://s/frame.png', durationSeconds: 5 };
+  const jobSet = (status: string, url?: string) => ({ id: 'js_1', jobs: [{ id: 'j1', status, results: url ? { raw: { url, type: 'video' } } : null }] });
 
-  it('sender startframen til DoP med Key-godkendelse', async () => {
-    const m = mockFetch(() => ({ json: { request_id: 'hf_1', status: 'queued' } }));
+  it('sender startframen til DoP pakket i params, med Key-godkendelse', async () => {
+    const m = mockFetch(() => ({ json: jobSet('queued') }));
     const a = createHiggsfield('id:secret', settings.higgsfield, HIGGSFIELD_MODELS, m.fn);
-    expect(await a.submit('dop-standard', video, 'g:1')).toEqual({ providerJobId: 'hf_1' });
+    expect(await a.submit('dop-standard', video, 'g:1')).toEqual({ providerJobId: 'js_1' });
     expect(m.calls[0]!.url).toBe('https://api.higgsfield.ai/v1/image2video/dop');
     expect(m.calls[0]!.headers.Authorization).toBe('Key id:secret');
     expect(m.calls[0]!.headers['hf-api-key']).toBe('id');
     expect(m.calls[0]!.headers['hf-secret']).toBe('secret');
-    expect(m.calls[0]!.body).toMatchObject({ model: 'dop-standard', input_images: [{ type: 'image_url', image_url: 'https://s/frame.png' }] });
+    expect(m.calls[0]!.body).toMatchObject({ params: { model: 'dop-standard', input_images: [{ type: 'image_url', image_url: 'https://s/frame.png' }] } });
   });
 
   it('en ny enkelt-nøgle sendes som "Key <nøgle>"', async () => {
-    const m = mockFetch(() => ({ json: { request_id: 'hf_2' } }));
+    const m = mockFetch(() => ({ json: jobSet('queued') }));
     await createHiggsfield('9a76abcdef157c', settings.higgsfield, HIGGSFIELD_MODELS, m.fn).submit('dop-standard', { ...video }, 'g:1');
     expect(m.calls[0]!.headers.Authorization).toBe('Key 9a76abcdef157c');
     expect(m.calls[0]!.headers['hf-secret']).toBeUndefined();
+  });
+
+  it('viser Higgsfields valideringsfejl (422) i klartekst', async () => {
+    const m = mockFetch(() => ({ status: 422, json: { detail: [{ loc: ['body', 'params', 'prompt'], msg: 'String should have at most 1000 characters' }] } }));
+    await expect(createHiggsfield('k:s', settings.higgsfield, HIGGSFIELD_MODELS, m.fn).submit('dop-standard', video, 'x'))
+      .rejects.toThrow('Higgsfield afviste kaldet (422): params.prompt: String should have at most 1000 characters');
   });
 
   it('uden startframe oprettes intet job', async () => {
@@ -96,26 +103,21 @@ describe('Higgsfield', () => {
     expect(m.calls).toHaveLength(0);
   });
 
-  it('oversætter status', async () => {
-    const s = async (json: unknown) => createHiggsfield('a:b', settings.higgsfield, HIGGSFIELD_MODELS, mockFetch(() => ({ json })).fn).status('hf');
-    expect(await s({ status: 'in_progress' })).toEqual({ state: 'running' });
-    expect(await s({ status: 'completed', video: { url: 'https://cdn/v.mp4' } })).toEqual({ state: 'succeeded', files: [{ url: 'https://cdn/v.mp4', mime: 'video/mp4' }] });
-    expect(await s({ status: 'nsfw' })).toMatchObject({ state: 'failed', retryable: false });
-    expect(await s({ status: 'failed' })).toMatchObject({ state: 'failed', retryable: true });
+  it('følger job-sættet og oversætter status', async () => {
+    const calls: string[] = [];
+    const s = async (json: unknown) => createHiggsfield('a:b', settings.higgsfield, HIGGSFIELD_MODELS, mockFetch((c) => { calls.push(c.url); return { json }; }).fn).status('js_1');
+    expect(await s(jobSet('in_progress'))).toEqual({ state: 'running' });
+    expect(await s(jobSet('completed', 'https://cdn/v.mp4'))).toEqual({ state: 'succeeded', files: [{ url: 'https://cdn/v.mp4', mime: 'video/mp4' }] });
+    expect(await s(jobSet('nsfw'))).toMatchObject({ state: 'failed', retryable: false });
+    expect(await s(jobSet('failed'))).toMatchObject({ state: 'failed', retryable: true });
+    expect(calls[0]).toBe('https://api.higgsfield.ai/v1/job-sets/js_1');
   });
 
-  it('et job i gang kan ikke stoppes — så er stoppet ikke bekræftet', async () => {
-    const running = mockFetch(() => ({ json: { status: 'in_progress' } }));
-    expect(await createHiggsfield('a:b', settings.higgsfield, HIGGSFIELD_MODELS, running.fn).cancel('hf')).toBe(false);
-    expect(running.calls.some((c) => c.method === 'POST')).toBe(false);
-    let cancelled = false;
-    const queued = mockFetch((c) => {
-      if (c.method === 'POST') { cancelled = true; return { json: {} }; }
-      return { json: { status: cancelled ? 'failed' : 'queued' } };
-    });
-    expect(await createHiggsfield('a:b', settings.higgsfield, HIGGSFIELD_MODELS, queued.fn).cancel('hf')).toBe(true);
-    const failed = mockFetch(() => ({ json: { status: 'failed' } }));
-    expect(await createHiggsfield('a:b', settings.higgsfield, HIGGSFIELD_MODELS, failed.fn).cancel('hf')).toBe(true);
+  it('kun et afsluttet job regnes som stoppet', async () => {
+    const running = mockFetch(() => ({ json: jobSet('in_progress') }));
+    expect(await createHiggsfield('a:b', settings.higgsfield, HIGGSFIELD_MODELS, running.fn).cancel('js_1')).toBe(false);
+    const failed = mockFetch(() => ({ json: jobSet('failed') }));
+    expect(await createHiggsfield('a:b', settings.higgsfield, HIGGSFIELD_MODELS, failed.fn).cancel('js_1')).toBe(true);
   });
 });
 

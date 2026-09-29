@@ -119,11 +119,11 @@ describe('Higgsfield Speak', () => {
   const settings = providerSettings(() => undefined).higgsfield;
 
   it('sender startframe og replik-lyd og vælger den korteste længde, der rummer shottet', async () => {
-    const m = mockFetch(() => new Response(JSON.stringify({ request_id: 'hf_s', status: 'queued' }), { status: 200 }));
+    const m = mockFetch(() => new Response(JSON.stringify({ id: 'js_s', jobs: [{ status: 'queued' }] }), { status: 200 }));
     const a = createHiggsfield('id:sec', settings, HIGGSFIELD_SPEAK_MODELS, m.fn);
     await a.submit('speak', { prompt: 'p', referenceUrls: [], startFrameUrl: 'https://s/f.png', audioUrl: 'https://s/l.wav', durationSeconds: 6, aspectRatio: '16:9' }, 'k');
     expect(m.calls[0]!.url).toBe('https://api.higgsfield.ai/v1/speak/higgsfield');
-    expect(JSON.parse(String(m.calls[0]!.init!.body))).toMatchObject({
+    expect(JSON.parse(String(m.calls[0]!.init!.body)).params).toMatchObject({
       input_image: { type: 'image_url', image_url: 'https://s/f.png' },
       input_audio: { type: 'audio_url', audio_url: 'https://s/l.wav' },
       duration: 10, quality: 'high',
