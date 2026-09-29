@@ -66,8 +66,19 @@ describe('prompten om ansigter og genstande', () => {
   });
 
   it('shots uden personer får ingen af reglerne (og bliver ikke forældede)', () => {
-    const { text } = compilePrompt({ ...base, assets: [{ code: 'LOC_01', kind: 'location', name: 'Køkken', version: 1, attributes: {}, referenceCount: 2 }] });
+    const { text, canonical } = compilePrompt({ ...base, assets: [{ code: 'LOC_01', kind: 'location', name: 'Køkken', version: 1, attributes: {}, referenceCount: 2 }] });
     expect(text).not.toContain('Ansigterne');
     expect(text).not.toContain(PROPS_RULE);
+    expect(canonical).not.toContain('guidance');
+  });
+
+  it('instruktionerne indgår i hashen, så nye regler gør gamle resultater forældede', () => {
+    for (const slot of ['start_frame', 'video'] as const) {
+      const { canonical } = compilePrompt({ ...base, slot });
+      expect(canonical).toContain('"guidance"');
+      expect(canonical).toContain(PROPS_RULE);
+    }
+    const talk = compilePrompt({ ...base, slot: 'video', speech: { line: 'Hej', audioId: 'a' }, speaker: { code: 'CHAR_02', name: 'Lone' } });
+    expect(talk.canonical).toContain('Ingen undertekster');
   });
 });

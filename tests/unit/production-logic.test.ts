@@ -126,7 +126,10 @@ describe('prompt-compiler', () => {
   it('en talende video får en kort Speak-prompt, men hashen følger hele inputtet', async () => {
     const talk = { ...base, slot: 'video' as const, startFrameId: 'f1', speech: { line: 'Den er klaret i dag.', audioId: 'a1' }, speaker: { code: 'CHAR_X_01', name: 'Person' } };
     const { text, canonical } = compilePrompt(talk);
-    expect(text).toContain('Person siger replikken på dansk: "Den er klaret i dag."');
+    expect(text).toContain('Person taler dansk — lyden er vedlagt.');
+    // Replikkens ord må aldrig stå i en videoprompt — så tegnes de som undertekster.
+    expect(text).not.toContain('Den er klaret i dag.');
+    expect(text).toContain('Ingen undertekster');
     expect(text).toContain('Kun Persons mund bevæger sig');
     expect(text).toContain('Spil: Underspillet.');
     expect(text).not.toContain('Film DNA');

@@ -67,12 +67,20 @@ export function canonicalJson(value: unknown): string {
 export function compilePrompt(input: PromptInput): CompiledPrompt {
   const lines: string[] = [];
   const dna = Object.entries(input.dna.fields).map(([k, v]) => `${k.toLowerCase()}: ${v}`).join('; ');
-  const canonical = canonicalJson({ ...input, assets: [...input.assets].sort((a, b) => a.code.localeCompare(b.code)), rules: [...input.rules].sort() });
+  // Hashen bygger på inputtet OG på de instruktioner, compileren selv lægger
+  // til (ansigter, genstande, replik). Ændres de, er resultaterne forældede —
+  // men kun for de shots, instruktionen faktisk gælder.
+  const canonicalOf = (guidance: string[]) => canonicalJson({
+    ...input, assets: [...input.assets].sort((a, b) => a.code.localeCompare(b.code)), rules: [...input.rules].sort(), guidance: guidance.length ? guidance : undefined,
+  });
 
   // Talende video: Speak skal kun vide, hvem der taler og hvordan. Resten
   // (komposition, lys, karakterer) ligger allerede i startframen. Hashen
   // bygger stadig på hele inputtet, så en ændring i fx DNA gør videoen forældet.
-  if (input.slot === 'video' && input.speech && input.speaker) return { text: speakPrompt(input, input.speaker, input.speech.line), canonical };
+  if (input.slot === 'video' && input.speech && input.speaker) {
+    const speak = speakPrompt(input, input.speaker);
+    return { text: speak.join('\n'), canonical: canonicalOf(speak) };
+  }
 
   lines.push(`Film DNA v${input.dna.version}: ${dna}.`);
   if (input.rules.length) lines.push(`Undgå: ${input.rules.map((r) => r.toLowerCase()).join('; ')}.`);
@@ -97,39 +105,48 @@ export function compilePrompt(input: PromptInput): CompiledPrompt {
   if (ruleDevs.length) lines.push(`Bevidste undtagelser: ${ruleDevs.map((d) => `"${d.ruleText}" gælder ikke her`).join('; ')}.`);
   // Personer: ansigterne skal være de samme som på referencebillederne — og i
   // video de samme hele klippet igennem. Det er det, der skrider først.
+  const guide: string[] = [];
   const people = assets.some((a) => a.kind === 'character');
   if (people && input.slot === 'start_frame') {
-    lines.push('Ansigterne skal matche karakterernes referencebilleder nøjagtigt: samme personer, samme alder, ansigtstræk, hår og hudfarve. Naturlige, menneskelige proportioner.');
+    guide.push('Ansigterne skal matche karakterernes referencebilleder nøjagtigt: samme personer, samme alder, ansigtstræk, hår og hudfarve. Naturlige, menneskelige proportioner.');
   }
   if (people && input.slot === 'video') {
-    lines.push('Personernes ansigter, alder, hår og tøj er uændrede gennem hele klippet — nøjagtig de samme personer som i startframen.');
-    lines.push('Rolige, naturlige bevægelser. Ingen hurtige hovedvendinger; ansigterne forbliver synlige og vender ikke bort fra kameraet.');
+    guide.push('Personernes ansigter, alder, hår og tøj er uændrede gennem hele klippet — nøjagtig de samme personer som i startframen.');
+    guide.push('Rolige, naturlige bevægelser. Ingen hurtige hovedvendinger; ansigterne forbliver synlige og vender ikke bort fra kameraet.');
   }
-  if (people) lines.push(PROPS_RULE);
+  if (people) guide.push(PROPS_RULE);
   if (input.slot === 'start_frame' && input.speaker) {
     const n = `${input.speaker.name} (${input.speaker.code})`;
-    lines.push(`Replik-shot: ${n} taler i dette shot. ${n}s ansigt skal ses tydeligt forfra eller i let halvprofil og fylde en tydelig del af billedet, i skarp fokus.`);
-    lines.push(`${n}s mund er lukket og afslappet, og intet dækker munden (ingen hånd, kop, mikrofon eller hår). Andre personer i billedet har lukket mund og ser mod ${input.speaker.name} eller er ude af fokus.`);
+    guide.push(`Replik-shot: ${n} taler i dette shot. ${n}s ansigt skal ses tydeligt forfra eller i let halvprofil og fylde en tydelig del af billedet, i skarp fokus.`);
+    guide.push(`${n}s mund er lukket og afslappet, og intet dækker munden (ingen hånd, kop, mikrofon eller hår). Andre personer i billedet har lukket mund og ser mod ${input.speaker.name} eller er ude af fokus.`);
   }
   if (input.slot === 'video') lines.push('Start fra den vedlagte, godkendte startframe og bevar komposition, karakterer og lys.');
-  if (input.slot === 'video' && input.speech) lines.push(`Replik på dansk — munden følger den vedlagte lyd: "${input.speech.line}"`);
+  // Replikkens ord står ALDRIG i en videoprompt: videomodellen skriver dem så
+  // ind i billedet som (forvrængede) undertekster. Munden styres af lyden.
+  if (input.slot === 'video' && input.speech) guide.push('Personen taler dansk; munden følger den vedlagte lyd.', NO_TEXT);
 
-  return { text: lines.join('\n'), canonical };
+  return { text: [...lines, ...guide].join('\n'), canonical: canonicalOf(guide) };
 }
 
 // Genstande i hænderne: modellerne ved ikke af sig selv, hvilken vej en
 // telefon vender, og lader den gerne vise skærmen ud mod kameraet.
-export const PROPS_RULE = 'Telefoner, skærme, bøger og papirer vender med forsiden mod den, der bruger dem — medmindre handlingen siger, at de vises frem.';
+export const PROPS_RULE = 'Telefoner, skærme, bøger og papirer vender med forsiden mod den, der bruger dem — medmindre handlingen siger, at de vises frem. '
+  + 'Skriver en person på en telefon, holdes den i personens egne hænder med skærmen mod personen, og tommelfingrene rører skærmen; skal skærmen ses, filmes den skråt over personens skulder. '
+  + 'Én telefon pr. person og ingen løse hænder eller genstande i billedkanten, der ikke hører til en person i billedet.';
 
-function speakPrompt(input: PromptInput, speaker: { code: string; name: string }, line: string): string {
+// Videomodeller skriver gerne tekst fra prompten ind i billedet.
+export const NO_TEXT = 'Ingen undertekster, billedtekster, titler eller anden påført tekst i billedet.';
+
+function speakPrompt(input: PromptInput, speaker: { code: string; name: string }): string[] {
   const s = input.shot;
   return [
-    `${speaker.name} siger replikken på dansk: "${line}"`,
+    `${speaker.name} taler dansk — lyden er vedlagt.`,
     `Læbebevægelserne følger den vedlagte lyd præcist, stavelse for stavelse. Kun ${speaker.name}s mund bevæger sig; andre i billedet taler ikke.`,
     `Små, naturlige hoved- og øjenbevægelser, rolig krop, ingen kamerabevægelse.${s.performance ? ` Spil: ${s.performance}.` : ''}`,
     'Bevar startframens komposition, lys, tøj og ansigter uændret.',
     PROPS_RULE,
-  ].join('\n');
+    NO_TEXT,
+  ];
 }
 
 export async function sha256Hex(text: string): Promise<string> {

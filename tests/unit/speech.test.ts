@@ -58,7 +58,7 @@ describe('planen for et shot med replik', () => {
     const s = plan.shots[0]!;
     expect(s.gates.video).toContainEqual({ ok: false, text: 'Kræver en godkendt replik' });
     expect(s.reco.video.pick?.capabilities).toContain('speech_to_video');
-    expect(s.prompts.video.text).toContain('Den er klaret i dag.');
+    expect(s.prompts.video.text).not.toContain('Den er klaret i dag.');
   });
 
   it('startframen viser talerens ansigt, og Speak får kun det, der styrer munden', async () => {
