@@ -19,6 +19,7 @@ import { decideAfterPoll, MAX_ATTEMPTS_PER_GENERATION } from '../_shared/product
 import { createRegistry, type Registry } from '../_shared/providers/registry.ts';
 import { simulatedFile } from '../_shared/providers/simulator.ts';
 import { ProviderRejectedError, type GenerationRequest } from '../_shared/providers/types.ts';
+import { orderReferences } from '../_shared/references.ts';
 
 const BATCH = 20;
 const MAX_FILE_BYTES = 300 * 1024 * 1024;
@@ -66,13 +67,18 @@ async function buildRequest(admin: Admin, g: Gen): Promise<GenerationRequest> {
   }
   const shot = await admin
     .from('shots')
-    .select('duration_seconds, approved_start_frame_id, approved_dialogue_id, shot_assets(asset_versions(asset_references(is_primary, media(storage_path))))')
+    .select('duration_seconds, approved_start_frame_id, approved_dialogue_id, shot_assets(assets(kind, name, code), asset_versions(asset_references(is_primary, media(storage_path))))')
     .eq('id', g.shot_id!)
     .single();
   if (shot.error) throw shot.error;
-  const refPaths = ((shot.data.shot_assets ?? []) as unknown as { asset_versions: { asset_references: { is_primary: boolean; media: { storage_path: string } }[] } }[])
-    .flatMap((sa) => sa.asset_versions.asset_references.sort((a, b) => Number(b.is_primary) - Number(a.is_primary)).slice(0, 4).map((r) => r.media.storage_path));
-  req.referenceUrls = await signedUrls(admin, refPaths);
+  type Linked = { assets: { kind: string; name: string; code: string }; asset_versions: { asset_references: { is_primary: boolean; media: { storage_path: string } }[] } };
+  const refs = orderReferences(((shot.data.shot_assets ?? []) as unknown as Linked[]).map((sa) => ({
+    kind: sa.assets.kind, name: sa.assets.name, code: sa.assets.code,
+    paths: [...sa.asset_versions.asset_references].sort((a, b) => Number(b.is_primary) - Number(a.is_primary)).map((r) => r.media.storage_path),
+  })));
+  req.referenceUrls = await signedUrls(admin, refs.paths);
+  // Mærkaterne passer kun, hvis alle billeder fik en adresse.
+  if (req.referenceUrls.length === refs.paths.length) req.referenceGroups = refs.groups;
   if (g.slot === 'video') {
     req.durationSeconds = Number(shot.data.duration_seconds);
     const frame = await admin.from('generations').select('media:output_media_id(storage_path)').eq('id', shot.data.approved_start_frame_id as string).single();

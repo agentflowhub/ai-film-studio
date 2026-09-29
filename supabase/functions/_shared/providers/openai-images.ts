@@ -9,7 +9,7 @@
 
 import type { ProviderSettings } from './catalog.ts';
 import { OPENAI_MODELS } from './catalog.ts';
-import { ProviderRejectedError, type ModelInfo, type ProviderAdapter, type ProviderStatus } from './types.ts';
+import { ProviderRejectedError, type GenerationRequest, type ModelInfo, type ProviderAdapter, type ProviderStatus } from './types.ts';
 
 const BASE = 'https://api.openai.com/v1';
 // Fejlkoder, hvor et nyt forsøg (evt. hos en anden model) giver mening.
@@ -44,10 +44,7 @@ export function createOpenAiImages(apiKey: string, settings: ProviderSettings['o
     models: () => models,
 
     async submit(model, req, idempotencyKey) {
-      const content = [
-        { type: 'input_text', text: req.prompt },
-        ...req.referenceUrls.map((url) => ({ type: 'input_image', image_url: url, detail: 'high' })),
-      ];
+      const content = imageContent(req);
       const res = await fetchFn(`${BASE}/responses`, {
         method: 'POST',
         headers,
@@ -109,4 +106,23 @@ async function reasonOf(res: Response): Promise<string> {
   } catch {
     return '';
   }
+}
+
+// Prompten og referencebillederne. Er billederne grupperet, står en mærkat
+// foran hver gruppe, så modellen ved, hvilke billeder der viser hvem.
+export function imageContent(req: Pick<GenerationRequest, 'prompt' | 'referenceUrls' | 'referenceGroups'>): ({ type: 'input_text'; text: string } | { type: 'input_image'; image_url: string; detail: 'high' })[] {
+  const image = (url: string) => ({ type: 'input_image' as const, image_url: url, detail: 'high' as const });
+  const groups = req.referenceGroups ?? [];
+  if (!groups.length || groups.reduce((n, g) => n + g.count, 0) !== req.referenceUrls.length) {
+    return [{ type: 'input_text', text: req.prompt }, ...req.referenceUrls.map(image)];
+  }
+  const out: ReturnType<typeof imageContent> = [{ type: 'input_text', text: req.prompt }];
+  let at = 0;
+  for (const g of groups) {
+    const n = g.count;
+    out.push({ type: 'input_text', text: `Referencebillede ${at + 1}${n > 1 ? `–${at + n}` : ''}: ${g.label}` });
+    out.push(...req.referenceUrls.slice(at, at + n).map(image));
+    at += n;
+  }
+  return out;
 }

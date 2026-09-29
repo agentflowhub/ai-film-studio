@@ -95,6 +95,17 @@ export function compilePrompt(input: PromptInput): CompiledPrompt {
   if (s.lighting) lines.push(`Lys: ${s.lighting}`);
   const ruleDevs = input.deviations.filter((d) => d.ruleText);
   if (ruleDevs.length) lines.push(`Bevidste undtagelser: ${ruleDevs.map((d) => `"${d.ruleText}" gælder ikke her`).join('; ')}.`);
+  // Personer: ansigterne skal være de samme som på referencebillederne — og i
+  // video de samme hele klippet igennem. Det er det, der skrider først.
+  const people = assets.some((a) => a.kind === 'character');
+  if (people && input.slot === 'start_frame') {
+    lines.push('Ansigterne skal matche karakterernes referencebilleder nøjagtigt: samme personer, samme alder, ansigtstræk, hår og hudfarve. Naturlige, menneskelige proportioner.');
+  }
+  if (people && input.slot === 'video') {
+    lines.push('Personernes ansigter, alder, hår og tøj er uændrede gennem hele klippet — nøjagtig de samme personer som i startframen.');
+    lines.push('Rolige, naturlige bevægelser. Ingen hurtige hovedvendinger; ansigterne forbliver synlige og vender ikke bort fra kameraet.');
+  }
+  if (people) lines.push(PROPS_RULE);
   if (input.slot === 'start_frame' && input.speaker) {
     const n = `${input.speaker.name} (${input.speaker.code})`;
     lines.push(`Replik-shot: ${n} taler i dette shot. ${n}s ansigt skal ses tydeligt forfra eller i let halvprofil og fylde en tydelig del af billedet, i skarp fokus.`);
@@ -106,6 +117,10 @@ export function compilePrompt(input: PromptInput): CompiledPrompt {
   return { text: lines.join('\n'), canonical };
 }
 
+// Genstande i hænderne: modellerne ved ikke af sig selv, hvilken vej en
+// telefon vender, og lader den gerne vise skærmen ud mod kameraet.
+export const PROPS_RULE = 'Telefoner, skærme, bøger og papirer vender med forsiden mod den, der bruger dem — medmindre handlingen siger, at de vises frem.';
+
 function speakPrompt(input: PromptInput, speaker: { code: string; name: string }, line: string): string {
   const s = input.shot;
   return [
@@ -113,6 +128,7 @@ function speakPrompt(input: PromptInput, speaker: { code: string; name: string }
     `Læbebevægelserne følger den vedlagte lyd præcist, stavelse for stavelse. Kun ${speaker.name}s mund bevæger sig; andre i billedet taler ikke.`,
     `Små, naturlige hoved- og øjenbevægelser, rolig krop, ingen kamerabevægelse.${s.performance ? ` Spil: ${s.performance}.` : ''}`,
     'Bevar startframens komposition, lys, tøj og ansigter uændret.',
+    PROPS_RULE,
   ].join('\n');
 }
 

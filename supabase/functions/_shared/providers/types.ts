@@ -22,6 +22,8 @@ export interface ModelInfo {
 export interface GenerationRequest {
   prompt: string;
   referenceUrls: string[];
+  // Hvem referencebillederne viser, i samme rækkefølge som referenceUrls.
+  referenceGroups?: { label: string; count: number }[];
   startFrameUrl?: string;
   durationSeconds?: number;
   // Replik: stemmen, der skal tale (prompt er selve replikken).
