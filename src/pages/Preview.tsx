@@ -6,7 +6,7 @@ import { FilmHeader } from '../components/Shell.tsx';
 import { Button, Empty, Notice, Progress, StatusPill, Thumb } from '../components/ui.tsx';
 import { outputFor, useFilm, type FilmData } from '../lib/data.ts';
 import { flash } from '../lib/flash.ts';
-import { download, exportFilm, fileName, type ExportPart } from '../lib/filmExport.ts';
+import { download, exportFilm, fileName, type ExportPart, type Transition } from '../lib/filmExport.ts';
 import { planFor, timecodes } from '../lib/derive.ts';
 import { shotState, tc } from '../lib/shotState.ts';
 
@@ -72,22 +72,26 @@ export function Preview({ filmId }: { filmId: string }) {
 
 // Et shot i den samlede film: det, Preview viser.
 function partFor(d: FilmData, s: FilmData['shots'][number]): ExportPart {
-  const v = s.approved_video_id ? outputFor(d, s, 'video') : null;
-  if (v?.url && v.gen.media?.mime.startsWith('video/')) return { kind: 'video', url: v.url };
-  const f = outputFor(d, s, 'start_frame');
   const seconds = Number(s.duration_seconds);
+  const v = s.approved_video_id ? outputFor(d, s, 'video') : null;
+  if (v?.url && v.gen.media?.mime.startsWith('video/')) {
+    const line = s.approved_dialogue_id ? d.generations.find((g) => g.id === s.approved_dialogue_id) : undefined;
+    return { kind: 'video', url: v.url, seconds, speechUrl: line?.media ? d.urls[line.media.storage_path] ?? null : null };
+  }
+  const f = outputFor(d, s, 'start_frame');
   return f?.url && f.gen.media?.mime.startsWith('image/') ? { kind: 'still', url: f.url, seconds } : { kind: 'black', seconds };
 }
 
 function SaveFilm({ d, done }: { d: FilmData; done: number }) {
   const [state, setState] = useState<{ share: number; step: string } | null>(null);
   const [failed, setFailed] = useState(false);
+  const [transition, setTransition] = useState<Transition>('cut');
   const total = d.shots.length;
   async function save() {
     setFailed(false);
     setState({ share: 0, step: 'Forbereder …' });
     try {
-      const blob = await exportFilm(d.shots.map((s) => partFor(d, s)), (share, step) => setState({ share, step }));
+      const blob = await exportFilm(d.shots.map((s) => partFor(d, s)), transition, (share, step) => setState({ share, step }));
       download(blob, fileName(d.project.title));
       flash('Filmen er gemt som MP4 i din Overførsler-mappe.');
     } catch (err) {
@@ -102,8 +106,12 @@ function SaveFilm({ d, done }: { d: FilmData; done: number }) {
       <div className="row between">
         <div>
           <h2>Gem filmen</h2>
-          <p className="muted small">Alle shots samles i storyboardets rækkefølge til én MP4-fil med lyd. Det sker i din browser og koster ikke noget. Første gang henter browseren et videoværktøj på ca. 30 MB.</p>
+          <p className="muted small">Alle shots samles i storyboardets rækkefølge til én MP4-fil med lyd, hvert shot i den længde, storyboardet angiver — talende shots dog altid til replikken er sagt færdig. Det sker i din browser og koster ikke noget. Første gang henter browseren et videoværktøj på ca. 30 MB.</p>
         </div>
+        <select value={transition} onChange={(e) => setTransition(e.target.value as Transition)} disabled={!!state} aria-label="Overgang mellem shots">
+          <option value="cut">Hårde klip</option>
+          <option value="soft">Bløde overgange</option>
+        </select>
         <Button kind="primary" disabled={!!state || !total} onClick={save}>{state ? 'Samler …' : 'Hent film (MP4)'}</Button>
       </div>
       {done < total && !state && <Notice tone="warn">{total - done} af {total} shots har ingen godkendt video endnu. De kommer med som startframe i shottets længde, eller som sort billede.</Notice>}
