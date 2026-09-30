@@ -232,3 +232,10 @@ describe('kameraets adfærd', () => {
     expect((await planProject(b)).shots[0]!.prompts.start_frame.hash).not.toBe(pa.prompts.start_frame.hash);
   });
 });
+
+describe('ElevenLabs-nøglens rettigheder', () => {
+  it('en nøgle uden adgang til lydeffekter forklares på dansk', async () => {
+    const { planHint } = await import('../../supabase/functions/_shared/providers/elevenlabs.ts');
+    expect(planHint(': The API key you used is missing the permission sound_generation to execute this operation.')).toContain('"Sound Effects"');
+  });
+});

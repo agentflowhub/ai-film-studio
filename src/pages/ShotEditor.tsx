@@ -374,7 +374,9 @@ export function AttemptTable({ d, gens }: { d: FilmData; gens: GenerationRow[] }
   const seconds = (a: { started_at: string | null; finished_at: string | null }) =>
     a.started_at && a.finished_at ? `${Math.round((new Date(a.finished_at).getTime() - new Date(a.started_at).getTime()) / 1000)} sek.` : a.started_at ? 'kører' : '—';
   const STATUS: Record<string, string> = { waiting: 'I kø', submitted: 'Sendt', running: 'Genererer', succeeded: 'Færdig', failed: 'Fejlet', cancelled: 'Stoppet' };
-  const TYPE: Record<string, string> = { reference: 'Reference', start_frame: 'Startframe', video: 'Video', dialogue: 'Replik' };
+  const TYPE: Record<string, string> = { reference: 'Reference', start_frame: 'Startframe', video: 'Video', dialogue: 'Replik', ambience: 'Rumlyd' };
+  // Referencer og rumlyd hører til et aktiv, ikke et shot: vis aktivets navn.
+  const assetName = (id: string | null) => d.assets.find((a) => a.asset_versions.some((v) => v.id === id))?.name ?? '—';
   return (
     <div className="tablewrap">
       <table className="table">
@@ -382,7 +384,7 @@ export function AttemptTable({ d, gens }: { d: FilmData; gens: GenerationRow[] }
         <tbody>
           {rows.map(({ g, a }) => (
             <tr key={`${g.id}:${a.attempt}`} className={a.attempt > 1 ? 'failover' : ''}>
-              <td><strong>{g.shot_id ? code(g.shot_id) : '—'}</strong></td>
+              <td><strong>{g.shot_id ? code(g.shot_id) : assetName(g.asset_version_id)}</strong></td>
               <td>{TYPE[g.slot]} v{g.version}</td>
               <td>{a.attempt > 1 && <span className="muted">↳ reserve: </span>}{a.provider} · {a.model}</td>
               <td><span className={`pill ${a.status === 'succeeded' ? 'approved' : a.status === 'failed' ? 'failed' : a.status === 'cancelled' ? 'rejected' : 'generating'}`}>{STATUS[a.status] ?? a.status}</span>{a.error?.reason && <span className="small muted"> {a.error.reason}</span>}</td>

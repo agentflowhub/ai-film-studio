@@ -118,6 +118,9 @@ async function tierOf(apiKey: string, fetchFn: typeof fetch): Promise<string | n
 // ElevenLabs' afvisning af en stemme, planen ikke dækker, oversat til noget,
 // brugeren kan handle på.
 export function planHint(reason: string): string {
+  if (/missing the permission/i.test(reason)) {
+    return ' — API-nøglen har ikke adgang til det. Giv nøglen adgang til "Sound Effects" og "Text to Speech" hos ElevenLabs (Developers → API Keys), eller lav en ny nøgle med de rettigheder.';
+  }
   return /cloned voices|library voices|upgrade your subscription/i.test(reason)
     ? ' — stemmen kræver et betalt ElevenLabs-abonnement. Vælg en af standardstemmerne under Karakterer, eller opgradér hos ElevenLabs.'
     : '';
