@@ -74,8 +74,9 @@ export const TAGLINE_SECONDS = 3;
 export const ENDCARD_SECONDS = 3.5;
 // Klippenes egen lyd, mens en voiceover taler.
 export const DUCK_VOLUME = 0.3;
-// Rumlyden ligger lavt under alt andet.
-export const AMBIENCE_VOLUME = 0.35;
+// Rumlyden normaliseres til samme lave niveau, uanset hvor stærkt den er
+// optaget (LUFS; replikker ligger omkring -18), så den altid høres — lavt.
+export const AMBIENCE_LUFS = -30;
 // En voiceover, der må stoppe før tid, tones ud over denne tid.
 export const VOICE_FADE = 0.15;
 
@@ -119,7 +120,7 @@ export function clipArgs(part: ExportPart, input: string, output: string, o: { h
   const tail = `atrim=end_sample=${samples},asetpts=PTS-STARTPTS,afade=t=in:d=${aFade.toFixed(3)},afade=t=out:st=${(exact - aFade).toFixed(3)}:d=${aFade.toFixed(3)}[a]`;
   const amb = o.ambience ? ['-stream_loop', '-1', '-ss', sec(o.ambience.offset), '-i', o.ambience.file] : [];
   const a = o.ambience
-    ? `${audio}${fmt},apad[own];[2:a]${fmt},volume=${AMBIENCE_VOLUME}[amb];[own][amb]amix=inputs=2:duration=first:normalize=0,${tail}`
+    ? `${audio}${fmt},apad[own];[2:a]${fmt},loudnorm=I=${AMBIENCE_LUFS}:LRA=11:TP=-3,${fmt}[amb];[own][amb]amix=inputs=2:duration=first:normalize=0,${tail}`
     : `${audio}${fmt},apad,${tail}`;
   return [...source, ...SILENCE, ...amb, '-filter_complex', `${v};${a}`, '-map', '[v]', '-map', '[a]', '-r', String(o.fps), ...MEZZANINE, output];
 }

@@ -160,6 +160,6 @@ describe('rumlyd', () => {
   it('lægges lavt under klippets egen lyd fra det rigtige sted', () => {
     const a = clipArgs({ kind: 'video', url: 'u', seconds: 5 }, 'i', 'c.mkv', { ...opts, ambience: { file: 'amb0.mp3', offset: 7.25 } });
     expect(a.slice(a.indexOf('-stream_loop'), a.indexOf('-stream_loop') + 6)).toEqual(['-stream_loop', '-1', '-ss', '7.250', '-i', 'amb0.mp3']);
-    expect(after(a, '-filter_complex')).toContain('[2:a]aresample=48000,aformat=sample_rates=48000:channel_layouts=stereo,volume=0.35[amb];[own][amb]amix=inputs=2');
+    expect(after(a, '-filter_complex')).toContain('[2:a]aresample=48000,aformat=sample_rates=48000:channel_layouts=stereo,loudnorm=I=-30:LRA=11:TP=-3,aresample=48000,aformat=sample_rates=48000:channel_layouts=stereo[amb];[own][amb]amix=inputs=2');
   });
 });

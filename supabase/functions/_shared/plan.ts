@@ -154,10 +154,14 @@ export function referencePrompt(asset: PlanAsset, v: PlanAssetVersion, dna: Plan
   return `Referenceark for ${asset.kind} ${asset.code} v${v.version} — ${asset.name}: ${attrs}. Neutral baggrund, flere vinkler, ensartet lys.${style}`;
 }
 
-// Rumlyd til en location: kun baggrundslyd, der kan ligge under replikker.
+// Rumlyd til en location: stedets hørbare baggrundslyde, der kan ligge under
+// replikker. "Room tone" alene giver næsten stilhed, så prompten beder om
+// stedets typiske, tydelige lyde i et naturligt niveau.
 export function ambiencePrompt(asset: PlanAsset, v: PlanAssetVersion): string {
   const attrs = Object.entries(v.attributes).sort(([a], [b]) => a.localeCompare(b)).map(([k, val]) => `${k.toLowerCase()}: ${val}`).join('; ');
-  return `Continuous ambient room tone for a film scene at ${asset.name}${attrs ? ` (${attrs})` : ''}. Natural, quiet background ambience only, recorded as room tone: no music, no speech, no sudden or loud sounds.`;
+  return `Clearly audible, continuous background atmosphere for a film scene at ${asset.name}${attrs ? ` (${attrs})` : ''}. `
+    + 'Layer the typical everyday sounds of this place at a natural, steady level — for example appliance hum, ventilation, distant traffic or voices through a window, footsteps or doors elsewhere in the building, birds outside — whatever fits the place. '
+    + 'No music, no clear speech, no sudden loud sounds.';
 }
 
 export async function planProject(input: PlanInput): Promise<ProjectPlan> {

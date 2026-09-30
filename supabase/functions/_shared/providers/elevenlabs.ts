@@ -74,7 +74,7 @@ async function soundRequest(apiKey: string, fetchFn: typeof fetch, model: string
   const res = await fetchFn(`${BASE}/v1/sound-generation?output_format=mp3_44100_128`, {
     method: 'POST',
     headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
-    body: JSON.stringify({ text: text.slice(0, 450), model_id: model, duration_seconds: Math.min(30, Math.max(1, seconds)), prompt_influence: 0.5, loop: true }),
+    body: JSON.stringify({ text: text.slice(0, 450), model_id: model, duration_seconds: Math.min(30, Math.max(1, seconds)), prompt_influence: 0.7, loop: true }),
   });
   if (!res.ok) {
     const reason = await reasonOf(res);
