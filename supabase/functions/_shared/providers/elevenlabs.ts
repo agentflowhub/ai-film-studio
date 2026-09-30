@@ -117,7 +117,16 @@ async function tierOf(apiKey: string, fetchFn: typeof fetch): Promise<string | n
 
 // ElevenLabs' afvisning af en stemme, planen ikke dækker, oversat til noget,
 // brugeren kan handle på.
+// En nøgle sat med citationstegn eller <> omkring (fx direkte fra en
+// vejledning) virker ikke hos ElevenLabs; de tegn er aldrig en del af nøglen.
+export function cleanKey(raw: string | undefined): string {
+  return (raw ?? '').trim().replace(/^[<'"]+|[>'"]+$/g, '').trim();
+}
+
 export function planHint(reason: string): string {
+  if (/invalid api key/i.test(reason)) {
+    return ' — ElevenLabs genkender ikke nøglen. Kopiér den igen fra Developers → API Keys og sæt den med: npx supabase secrets set ELEVENLABS_API_KEY=nøglen (uden citationstegn eller <>).';
+  }
   if (/missing the permission/i.test(reason)) {
     return ' — API-nøglen har ikke adgang til det. Giv nøglen adgang til "Sound Effects" og "Text to Speech" hos ElevenLabs (Developers → API Keys), eller lav en ny nøgle med de rettigheder.';
   }

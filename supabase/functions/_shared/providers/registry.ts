@@ -6,7 +6,7 @@
 // Simulatoren kan kun bruges, når ALLOW_SIMULATOR_PROVIDER=true — aldrig i produktion.
 
 import { ELEVENLABS_MODELS, ELEVENLABS_SOUND_MODELS, HIGGSFIELD_MODELS, HIGGSFIELD_SPEAK_MODELS, OPENAI_MODELS, providerSettings, withPrices } from './catalog.ts';
-import { createElevenLabs } from './elevenlabs.ts';
+import { cleanKey, createElevenLabs } from './elevenlabs.ts';
 import { createHiggsfield } from './higgsfield.ts';
 import { createOpenAiImages } from './openai-images.ts';
 import { createSimulator, SIMULATOR_MODELS } from './simulator.ts';
@@ -36,7 +36,7 @@ export function createRegistry(getEnv: (key: string) => string | undefined, fetc
     adapters.set('higgsfield', createHiggsfield(hf, settings.higgsfield, m, fetchFn));
     models.push(...m);
   }
-  const eleven = getEnv('ELEVENLABS_API_KEY')?.trim();
+  const eleven = cleanKey(getEnv('ELEVENLABS_API_KEY'));
   if (eleven) {
     const m = withPrices([...ELEVENLABS_MODELS, ...ELEVENLABS_SOUND_MODELS], getEnv);
     adapters.set('elevenlabs', createElevenLabs(eleven, settings.elevenlabs, m, fetchFn));

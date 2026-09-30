@@ -239,3 +239,14 @@ describe('ElevenLabs-nøglens rettigheder', () => {
     expect(planHint(': The API key you used is missing the permission sound_generation to execute this operation.')).toContain('"Sound Effects"');
   });
 });
+
+describe('ElevenLabs-nøglen', () => {
+  it('citationstegn og <> omkring nøglen fjernes', async () => {
+    const { cleanKey } = await import('../../supabase/functions/_shared/providers/elevenlabs.ts');
+    expect([cleanKey(' sk_abc '), cleanKey("'sk_abc'"), cleanKey('<sk_abc>'), cleanKey('"<sk_abc>"'), cleanKey(undefined)]).toEqual(['sk_abc', 'sk_abc', 'sk_abc', 'sk_abc', '']);
+  });
+  it('en ukendt nøgle forklares på dansk', async () => {
+    const { planHint } = await import('../../supabase/functions/_shared/providers/elevenlabs.ts');
+    expect(planHint(': Invalid API key')).toContain('genkender ikke nøglen');
+  });
+});
