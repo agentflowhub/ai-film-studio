@@ -108,3 +108,25 @@ describe('fysisk logik', () => {
     expect(STORYBOARD_SYSTEM_PROMPT).toContain('aldrig telefonen mod kameraet');
   });
 });
+
+describe('genstande dukker ikke op og bøjer ikke', () => {
+  const base: PromptInput = {
+    slot: 'start_frame', dna: { version: 1, fields: {} }, rules: [],
+    shot: { duration_seconds: 4, shot_type: 'medium', lens_mm: null, movement: 'static', action: 'Mikkel strammer vandhanen.', notes: null, performance: null, lighting: null },
+    assets: [{ code: 'CHAR_01', kind: 'character', name: 'Mikkel', version: 1, attributes: {}, referenceCount: 4 }], deviations: [],
+  };
+
+  it('startframen viser alt, der bruges; videoen tilføjer intet og former intet om', async () => {
+    const { OBJECTS_START_RULE, OBJECTS_VIDEO_RULE } = await import('../../supabase/functions/_shared/prompt.ts');
+    expect(compilePrompt(base).text).toContain(OBJECTS_START_RULE);
+    const video = compilePrompt({ ...base, slot: 'video' }).text;
+    expect(video).toContain(OBJECTS_VIDEO_RULE);
+    expect(video).toContain('stay completely rigid');
+  });
+
+  it('instruktøren skriver genstande ind fra første billede og deler handlinger op', async () => {
+    const { STORYBOARD_SYSTEM_PROMPT } = await import('../../supabase/functions/_shared/prompts.ts');
+    expect(STORYBOARD_SYSTEM_PROMPT).toContain('synligt\n  fra shottets første billede');
+    expect(STORYBOARD_SYSTEM_PROMPT).toContain('to shots med et klip imellem');
+  });
+});

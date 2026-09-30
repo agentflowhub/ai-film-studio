@@ -137,6 +137,8 @@ export function compilePrompt(input: PromptInput): CompiledPrompt {
     guide.push('Calm, natural movement. No sudden head turns; faces stay visible and do not turn away from the camera.');
   }
   if (people) guide.push(PROPS_RULE, PHYSICS_RULE);
+  if (people && input.slot === 'start_frame') guide.push(OBJECTS_START_RULE);
+  if (people && input.slot === 'video') guide.push(OBJECTS_VIDEO_RULE);
   if (people && input.slot === 'video') guide.push('Objects held in the hands keep their orientation for the whole shot; a phone never turns its screen toward the camera.');
   if (input.slot === 'start_frame' && input.speaker) {
     const n = `${input.speaker.name} (${input.speaker.code})`;
@@ -161,6 +163,13 @@ export const PROPS_RULE = 'Phones, screens, books and papers face the person usi
 
 // Fysisk logik: modellerne lader gerne døre åbne sig forkert og genstande
 // flytte sig. Beskrevet én gang, gælder for alle shots med personer.
+// Genstande: videomodellen finder på det, der mangler i startframen (en
+// telefon ud af den blå luft), og lader faste ting blive bløde. Startframen
+// skal derfor vise alt, der bruges, og videoen må intet tilføje eller forme om.
+export const OBJECTS_START_RULE = 'Every object the action uses (phone, tool, cup, key) is already visible in this frame — in the person\'s hand or within reach — exactly where the action begins.';
+export const OBJECTS_VIDEO_RULE = 'Small, slow, natural movements only. No object appears, disappears, is taken out or changes hands during the shot; everything used is already visible in the start frame. '
+  + 'Rigid objects — taps, pipes, tools, phones, doors, furniture — stay completely rigid and keep their exact shape; nothing bends, melts or deforms.';
+
 export const PHYSICS_RULE = 'Physically plausible actions, the way people really do them: a door is opened by gripping its handle (on the side opposite the hinges) and pulling or pushing it — never by pushing the hinge side or the middle of the door. '
   + 'Hands grip objects firmly and believably; objects keep their size, shape and orientation and do not float, merge or rotate by themselves.';
 
