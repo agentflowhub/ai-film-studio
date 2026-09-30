@@ -136,7 +136,8 @@ export function compilePrompt(input: PromptInput): CompiledPrompt {
     guide.push("The people's faces, age, hair and clothing stay unchanged for the entire shot — exactly the same people as in the start frame.");
     guide.push('Calm, natural movement. No sudden head turns; faces stay visible and do not turn away from the camera.');
   }
-  if (people) guide.push(PROPS_RULE);
+  if (people) guide.push(PROPS_RULE, PHYSICS_RULE);
+  if (people && input.slot === 'video') guide.push('Objects held in the hands keep their orientation for the whole shot; a phone never turns its screen toward the camera.');
   if (input.slot === 'start_frame' && input.speaker) {
     const n = `${input.speaker.name} (${input.speaker.code})`;
     guide.push(`Dialogue shot: ${n} speaks in this shot. ${n}'s face is clearly visible, frontal or slight three-quarter, a clear part of the frame, in sharp focus.`);
@@ -154,8 +155,14 @@ export function compilePrompt(input: PromptInput): CompiledPrompt {
 // Genstande i hænderne: modellerne ved ikke af sig selv, hvilken vej en
 // telefon vender, og lader den gerne vise skærmen ud mod kameraet.
 export const PROPS_RULE = 'Phones, screens, books and papers face the person using them, unless the action says they are being shown to someone. '
-  + "When someone types on a phone, it is held in that person's own hands with the screen toward them and the thumbs on the screen; if the screen must be seen, film it over the person's shoulder. "
-  + 'One phone per person, and no stray hands or objects at the frame edge that do not belong to someone in the shot.';
+  + "A phone is held in the person's own hand with its screen toward their face and its back toward the camera; the thumbs are on the screen when typing. "
+  + "The screen is only visible to the viewer when the camera looks over the person's shoulder or in a close insert of the phone in their hand — the person never turns the phone toward the camera. "
+  + 'During a call the phone is held against the ear. One phone per person, and no stray hands or objects at the frame edge that do not belong to someone in the shot.';
+
+// Fysisk logik: modellerne lader gerne døre åbne sig forkert og genstande
+// flytte sig. Beskrevet én gang, gælder for alle shots med personer.
+export const PHYSICS_RULE = 'Physically plausible actions, the way people really do them: a door is opened by gripping its handle (on the side opposite the hinges) and pulling or pushing it — never by pushing the hinge side or the middle of the door. '
+  + 'Hands grip objects firmly and believably; objects keep their size, shape and orientation and do not float, merge or rotate by themselves.';
 
 // Billed- og videomodeller skriver gerne tekst fra prompten ind i billedet.
 // Undertekster, titler og slogan lægges på, når filmen samles.
@@ -170,6 +177,7 @@ function speakPrompt(input: PromptInput, speaker: { code: string; name: string }
     s.camera?.trim() ? `Camera operator behaviour: ${s.camera.trim()}` : 'The camera holds steady.',
     'Preserve the start frame composition, lighting, clothing and faces unchanged.',
     PROPS_RULE,
+    PHYSICS_RULE,
     NO_TEXT,
   ];
 }

@@ -2,7 +2,7 @@
 // kommer først, og prompten kræver samme ansigter og rigtigt vendte telefoner.
 
 import { describe, expect, it } from 'vitest';
-import { compilePrompt, PROPS_RULE, type PromptInput } from '../../supabase/functions/_shared/prompt.ts';
+import { compilePrompt, PHYSICS_RULE, PROPS_RULE, type PromptInput } from '../../supabase/functions/_shared/prompt.ts';
 import { imageContent } from '../../supabase/functions/_shared/providers/openai-images.ts';
 import { orderReferences } from '../../supabase/functions/_shared/references.ts';
 
@@ -80,5 +80,31 @@ describe('prompten om ansigter og genstande', () => {
     }
     const talk = compilePrompt({ ...base, slot: 'video', speech: { line: 'Hej', audioId: 'a' }, speaker: { code: 'CHAR_02', name: 'Lone' } });
     expect(talk.canonical).toContain('No subtitles');
+  });
+});
+
+describe('fysisk logik', () => {
+  const base: PromptInput = {
+    slot: 'start_frame', dna: { version: 1, fields: {} }, rules: [],
+    shot: { duration_seconds: 4, shot_type: 'medium', lens_mm: null, movement: 'static', action: 'Lone åbner døren til kælderen.', notes: null, performance: null, lighting: null },
+    assets: [{ code: 'CHAR_02', kind: 'character', name: 'Lone', version: 1, attributes: {}, referenceCount: 4 }], deviations: [],
+  };
+
+  it('døre åbnes med håndtaget, og telefonens bagside vender mod kameraet', () => {
+    for (const slot of ['start_frame', 'video'] as const) {
+      const { text } = compilePrompt({ ...base, slot });
+      expect(text).toContain(PHYSICS_RULE);
+      expect(text).toContain('gripping its handle');
+      expect(text).toContain('back toward the camera');
+    }
+    expect(compilePrompt({ ...base, slot: 'video' }).text).toContain('never turns its screen toward the camera');
+  });
+
+  it('instruktøren får reglerne for længder, voiceover og fysisk logik', async () => {
+    const { STORYBOARD_SYSTEM_PROMPT } = await import('../../supabase/functions/_shared/prompts.ts');
+    expect(STORYBOARD_SYSTEM_PROMPT).toContain('højst være 5 sek.');
+    expect(STORYBOARD_SYSTEM_PROMPT).toContain('KUN over shots uden egen replik');
+    expect(STORYBOARD_SYSTEM_PROMPT).toContain('tage i håndtaget');
+    expect(STORYBOARD_SYSTEM_PROMPT).toContain('aldrig telefonen mod kameraet');
   });
 });
