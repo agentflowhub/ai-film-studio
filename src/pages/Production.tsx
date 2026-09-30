@@ -1,5 +1,6 @@
-// Produktion: hvad kan laves nu, hvad koster det, og hvad venter på dig.
-// Én godkendelse starter en hel pakke — prisen er den, du så.
+// Produktion: hvad venter på dig, hvad kan laves nu, og hvad koster det.
+// Én godkendelse starter en hel pakke — prisen er den, du så. Står der noget
+// til godkendelse, åbner siden dér.
 
 import { useRef, useState } from 'react';
 import { FilmHeader } from '../components/Shell.tsx';
@@ -7,51 +8,33 @@ import { Button, Empty, Notice, Progress, Tabs, Thumb } from '../components/ui.t
 import { api } from '../lib/api.ts';
 import { outputFor, useFilm, type FilmData } from '../lib/data.ts';
 import { changedPrice } from '../lib/describeError.ts';
+import { waitingFor } from '../lib/flow.ts';
 import { spentCents } from '../lib/derive.ts';
 import { useRun } from '../lib/flash.ts';
 import { IdempotencyKey } from '../lib/idempotency.ts';
 import { go, href } from '../lib/router.ts';
 import { kr } from '../lib/shotState.ts';
 import type { PackageItem, ProductionItem } from '../lib/types.ts';
-import { GenCard } from '../components/GenCards.tsx';
+import { ReviewQueue } from '../components/ReviewQueue.tsx';
 import { AttemptTable } from './ShotEditor.tsx';
 
-type Tab = 'control' | 'queue';
+type Tab = 'review' | 'control' | 'queue';
 
 export function Production({ filmId, tab }: { filmId: string; tab?: string }) {
   const { data } = useFilm();
   if (!data) return null;
-  const current: Tab = tab === 'queue' ? 'queue' : 'control';
+  const waiting = waitingFor(data).length;
+  const current: Tab = tab === 'review' || tab === 'control' || tab === 'queue' ? tab : waiting ? 'review' : 'control';
   const running = data.generations.filter((g) => g.status === 'queued' || g.status === 'running').length;
   return (
     <>
       <FilmHeader route={{ name: 'production', filmId }} />
       <div className="page">
-        <Journey d={data} />
-        <Tabs<Tab> value={current} onChange={(t) => go({ name: 'production', filmId, tab: t })} items={[['control', 'Kontrol'], ['queue', `Kø${running ? ` (${running})` : ''}`]]} />
-        {current === 'control' ? <Control d={data} /> : <Queue d={data} />}
+        <Tabs<Tab> value={current} onChange={(t) => go({ name: 'production', filmId, tab: t })}
+          items={[['review', `Til godkendelse${waiting ? ` (${waiting})` : ''}`], ['control', 'Lav nyt'], ['queue', `Kø${running ? ` (${running})` : ''}`]]} />
+        {current === 'review' ? <ReviewQueue d={data} /> : current === 'control' ? <Control d={data} /> : <Queue d={data} />}
       </div>
     </>
-  );
-}
-
-function Journey({ d }: { d: FilmData }) {
-  const shots = d.plan?.shots ?? [];
-  const all = (f: (s: (typeof shots)[number]) => boolean) => shots.length > 0 && shots.every(f);
-  const steps: [string, boolean][] = [
-    ['Brief', d.brief?.status === 'approved'],
-    ['Film DNA', d.dna?.status === 'approved'],
-    ['Storyboard', d.storyboard?.status === 'approved'],
-    ['Mastere', d.assets.length > 0 && d.assets.every((a) => a.master_version_id)],
-    ['Startframes', all((s) => s.frame.status === 'approved')],
-    ['Videoer', all((s) => s.video.status === 'approved')],
-    ['Preview', all((s) => s.video.status === 'approved')],
-  ];
-  const at = steps.findIndex(([, ok]) => !ok);
-  return (
-    <ol className="journey">
-      {steps.map(([label, ok], i) => <li key={label} className={ok ? 'done' : i === at ? 'now' : ''}><span>{ok ? '✓' : i + 1}</span>{label}</li>)}
-    </ol>
   );
 }
 
@@ -60,7 +43,6 @@ const toItem = (p: PackageItem): ProductionItem => (p.slot === 'reference' ? { s
 
 function Control({ d }: { d: FilmData }) {
   const { busy, run } = useRun();
-  const review = useRun();
   const pk = d.plan?.packages;
   const groups: [string, string, PackageItem[]][] = pk ? [
     ['masters', 'Mastere', pk.masters],
@@ -101,21 +83,17 @@ function Control({ d }: { d: FilmData }) {
       }
     }
   }
-  const waiting = d.generations.filter((g) => g.status === 'succeeded' && g.review === 'pending');
+  const waiting = waitingFor(d).length;
   const blocked = d.plan?.blocked ?? [];
 
   if (!d.plan) return <Empty title="Produktionen er ikke klar">{d.planError ? <p className="muted">{d.planError}</p> : <p className="muted">Godkend storyboardet først.</p>}</Empty>;
   return (
     <div className="prodgrid">
       <div className="stack">
-        {waiting.length > 0 && (
-          <div className="card">
-            <h2>Til gennemsyn <span className="badge">{waiting.length}</span></h2>
-            <div className="results">
-              {waiting.map((g) => <GenCard key={g.id} d={d} g={g} approved={false} busy={!!review.busy} label={genLabel(d, g)}
-                onReview={(dec) => review.run(g.id, () => api.review(g.id, dec), dec === 'approved' ? 'Godkendt.' : 'Afvist.')} />)}
-            </div>
-          </div>
+        {waiting > 0 && (
+          <Notice tone="info" action={<a className="btn sm primary" href={href({ name: 'production', filmId: d.project.id, tab: 'review' })}>Gå til godkendelse</a>}>
+            {waiting} {waiting === 1 ? 'resultat venter' : 'resultater venter'} på din godkendelse.
+          </Notice>
         )}
         {groups.map(([k, title, items]) => (
           <div key={k} className="card">
@@ -184,13 +162,8 @@ function Control({ d }: { d: FilmData }) {
   );
 }
 
-function genLabel(d: FilmData, g: FilmData['generations'][number]): string {
-  if (g.shot_id) return `Shot ${d.shots.find((s) => s.id === g.shot_id)?.code ?? ''} ${g.slot === 'video' ? 'video' : g.slot === 'dialogue' ? 'replik' : 'startframe'}`;
-  return d.assets.find((a) => a.asset_versions.some((v) => v.id === g.asset_version_id))?.name ?? 'Reference';
-}
-
 function Queue({ d }: { d: FilmData }) {
-  if (!d.generations.length) return <Empty title="Køen er tom"><p className="muted">Start produktion under Kontrol.</p></Empty>;
+  if (!d.generations.length) return <Empty title="Køen er tom"><p className="muted">Start produktion under Lav nyt.</p></Empty>;
   return (
     <div className="card">
       <p className="muted small">Hvert forsøg hos en provider. Fejler et forsøg, stoppes det og bekræftes, før reserven tager over — så du aldrig betaler for to på én gang.</p>

@@ -56,21 +56,10 @@ export function ZoomThumb({ url, mime, alt, ratio, empty }: { url?: string | nul
   );
 }
 
-// En video med personer godkendes først, når mennesket har set efter det,
-// ingen model kan garantere: at ansigterne holder hele klippet — og i en
-// talende video, at munden følger lyden, og at det er den rigtige, der taler.
-// Afkrydsningen gemmes ikke; den skal gøres pr. video.
-function VideoCheck({ items, checked, onChange, withSound }: { items: string[]; checked: boolean[]; onChange: (c: boolean[]) => void; withSound: boolean }) {
-  return (
-    <fieldset className="speechcheck">
-      <legend className="small">{withSound ? 'Se videoen med lyd, før du godkender' : 'Se videoen, før du godkender'}</legend>
-      {items.map((text, i) => (
-        <label key={text} className="small">
-          <input type="checkbox" checked={!!checked[i]} onChange={(e) => onChange(items.map((_, j) => (j === i ? e.target.checked : !!checked[j])))} /> {text}
-        </label>
-      ))}
-    </fieldset>
-  );
+// Hvad mennesket skal se efter i en video, før det godkender: ansigterne, og
+// ved tale munden og taleren. Kun en påmindelse — godkendelsen er ét klik.
+function VideoHint({ items }: { items: string[] }) {
+  return <p className="muted small">Se efter: {items.join(' · ').toLowerCase()}.</p>;
 }
 
 const stateOf = (g: GenerationRow) =>
@@ -94,10 +83,7 @@ export function GenCard({ d, g, approved, busy, onReview, onRetry, label }: {
   const shot = g.slot === 'video' ? d.shots.find((s) => s.id === g.shot_id) : undefined;
   const people = !!shot?.shot_assets.some((sa) => d.assets.find((a) => a.id === sa.asset_id)?.kind === 'character');
   const items = g.slot === 'video' ? videoChecks(speaker, people) : [];
-  const [checked, setChecked] = useState<boolean[]>([]);
-  const needsCheck = items.length > 0 && state === 'needs_approval';
-  const blocked = needsCheck && !items.every((_, i) => checked[i]);
-  const check = needsCheck ? <VideoCheck items={items} checked={checked} onChange={setChecked} withSound={!!speaker} /> : null;
+  const check = items.length > 0 && state === 'needs_approval' ? <VideoHint items={items} /> : null;
   return (
     <figure className={`gencard ${approved ? 'chosen' : ''}`}>
       {url && g.media?.mime.startsWith('audio/') ? (
@@ -120,14 +106,14 @@ export function GenCard({ d, g, approved, busy, onReview, onRetry, label }: {
         {check}
         {state === 'needs_approval' && (
           <div className="row">
-            <Button small kind="approve" disabled={busy || blocked} title={blocked ? 'Sæt alle flueben først' : undefined} onClick={() => onReview('approved')}>{texts.common.approve}</Button>
+            <Button small kind="approve" disabled={busy} onClick={() => onReview('approved')}>{texts.common.approve}</Button>
             <Button small kind="reject" disabled={busy} onClick={() => onReview('rejected')}>{texts.common.reject}</Button>
           </div>
         )}
         {state === 'failed' && onRetry && <Button small disabled={busy} onClick={onRetry}>Prøv igen</Button>}
       </figcaption>
       {open && url && !g.media?.mime.startsWith('audio/') && (
-        <Lightbox url={url} mime={g.media?.mime} title={title} busy={busy} onClose={() => setOpen(false)} onReview={state === 'needs_approval' ? onReview : undefined} approveBlocked={blocked}>{check}</Lightbox>
+        <Lightbox url={url} mime={g.media?.mime} title={title} busy={busy} onClose={() => setOpen(false)} onReview={state === 'needs_approval' ? onReview : undefined}>{check}</Lightbox>
       )}
     </figure>
   );
