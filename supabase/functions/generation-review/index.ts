@@ -6,6 +6,7 @@
 //   * video      → shottets godkendte video
 //   * dialogue   → shottets godkendte replik (dansk tale), som videoen bygger på
 //   * reference  → aktiv-versionen godkendes og bliver master, hvis aktivet ikke har en
+//   * ambience   → locationens rumlyd; godkendt bruges den, når filmen samles
 // Databasen afviser alt andet (shot_approved_outputs_valid,
 // asset_version_requires_reviewed_reference).
 
@@ -41,7 +42,7 @@ serve('generation-review', GenerationReviewRequestSchema, async ({ admin, userId
       const field = g.data.slot === 'start_frame' ? 'approved_start_frame_id' : g.data.slot === 'dialogue' ? 'approved_dialogue_id' : 'approved_video_id';
       const upd = await admin.from('shots').update({ [field]: g.data.id }).eq('id', g.data.shot_id as string);
       if (upd.error) throw upd.error;
-    } else {
+    } else if (g.data.slot === 'reference') {
       const versionId = g.data.asset_version_id as string;
       // Resultatet bliver versionens primære reference.
       const ref = await admin

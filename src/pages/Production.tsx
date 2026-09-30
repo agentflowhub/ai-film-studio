@@ -39,7 +39,8 @@ export function Production({ filmId, tab }: { filmId: string; tab?: string }) {
 }
 
 const keyOf = (p: PackageItem) => `${p.slot}:${p.shotId ?? p.assetVersionId}`;
-const toItem = (p: PackageItem): ProductionItem => (p.slot === 'reference' ? { slot: 'reference', asset_version_id: p.assetVersionId! } : { slot: p.slot, shot_id: p.shotId! });
+const toItem = (p: PackageItem): ProductionItem =>
+  p.slot === 'reference' || p.slot === 'ambience' ? { slot: p.slot, asset_version_id: p.assetVersionId! } : { slot: p.slot, shot_id: p.shotId! };
 
 function Control({ d }: { d: FilmData }) {
   const { busy, run } = useRun();
@@ -49,6 +50,7 @@ function Control({ d }: { d: FilmData }) {
     ['frames', 'Startframes', pk.frames],
     ['lines', 'Replikker (dansk tale)', pk.lines],
     ['videos', 'Videoer', pk.videos],
+    ['sounds', 'Rumlyd', pk.sounds ?? []],
   ] : [];
   const every = groups.flatMap(([, , items]) => items);
   // Fravalgte pakker huskes; alt andet er valgt som standard.

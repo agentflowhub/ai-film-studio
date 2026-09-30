@@ -2,10 +2,10 @@
 //   OPENAI_API_KEY          → OpenAI (ChatGPT Images) til billeder
 //   HIGGSFIELD_CREDENTIALS  → Higgsfield til video og talende video (API-nøglen,
 //                             eller et ældre "KEY_ID:KEY_SECRET"-par)
-//   ELEVENLABS_API_KEY      → ElevenLabs til dansk tale
+//   ELEVENLABS_API_KEY      → ElevenLabs til dansk tale og rumlyd
 // Simulatoren kan kun bruges, når ALLOW_SIMULATOR_PROVIDER=true — aldrig i produktion.
 
-import { ELEVENLABS_MODELS, HIGGSFIELD_MODELS, HIGGSFIELD_SPEAK_MODELS, OPENAI_MODELS, providerSettings, withPrices } from './catalog.ts';
+import { ELEVENLABS_MODELS, ELEVENLABS_SOUND_MODELS, HIGGSFIELD_MODELS, HIGGSFIELD_SPEAK_MODELS, OPENAI_MODELS, providerSettings, withPrices } from './catalog.ts';
 import { createElevenLabs } from './elevenlabs.ts';
 import { createHiggsfield } from './higgsfield.ts';
 import { createOpenAiImages } from './openai-images.ts';
@@ -38,7 +38,7 @@ export function createRegistry(getEnv: (key: string) => string | undefined, fetc
   }
   const eleven = getEnv('ELEVENLABS_API_KEY')?.trim();
   if (eleven) {
-    const m = withPrices(ELEVENLABS_MODELS, getEnv);
+    const m = withPrices([...ELEVENLABS_MODELS, ...ELEVENLABS_SOUND_MODELS], getEnv);
     adapters.set('elevenlabs', createElevenLabs(eleven, settings.elevenlabs, m, fetchFn));
     models.push(...m);
   }

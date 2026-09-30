@@ -8,7 +8,9 @@
 // Stemmer: GET /v1/voices.
 
 import type { ProviderSettings } from './catalog.ts';
-import { ELEVENLABS_MODELS } from './catalog.ts';
+import { AMBIENCE_SECONDS, ELEVENLABS_MODELS, ELEVENLABS_SOUND_MODELS } from './catalog.ts';
+
+const SOUND_MODELS = new Set(ELEVENLABS_SOUND_MODELS.map((m) => m.model));
 import { ProviderRejectedError, type ModelInfo, type ProviderAdapter } from './types.ts';
 
 const BASE = 'https://api.elevenlabs.io';
@@ -21,11 +23,13 @@ export interface Voice {
 }
 
 export function createElevenLabs(apiKey: string, settings: ProviderSettings['elevenlabs'], models: ModelInfo[] = ELEVENLABS_MODELS, fetchFn: typeof fetch = fetch): ProviderAdapter {
+  const sound = (model: string, text: string, seconds: number) => soundRequest(apiKey, fetchFn, model, text, seconds);
   return {
     id: 'elevenlabs',
     models: () => models,
 
     async run(model, req) {
+      if (SOUND_MODELS.has(model)) return sound(model, req.prompt, req.durationSeconds ?? AMBIENCE_SECONDS);
       if (!req.voiceId) throw new ProviderRejectedError('replikken har ingen stemme', 400);
       const text = req.prompt.trim();
       if (!text) throw new ProviderRejectedError('replikken er tom', 400);
@@ -64,6 +68,26 @@ export function createElevenLabs(apiKey: string, settings: ProviderSettings['ele
 // Kun stemmer, kontoen faktisk må bruge via API'et. På gratisplanen afviser
 // ElevenLabs klonede stemmer og stemmer fra Voice Library (401), så dér vises
 // kun ElevenLabs' egne standardstemmer. Kan planen ikke aflæses, vises alle.
+// Rumlyd: POST /v1/sound-generation med en beskrivelse; svaret er selve
+// lydfilen (MP3). Loop gør, at klippet kan gentages uden et hørbart hop.
+async function soundRequest(apiKey: string, fetchFn: typeof fetch, model: string, text: string, seconds: number): Promise<{ bytes: Uint8Array; mime: string }> {
+  const res = await fetchFn(`${BASE}/v1/sound-generation?output_format=mp3_44100_128`, {
+    method: 'POST',
+    headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
+    body: JSON.stringify({ text: text.slice(0, 450), model_id: model, duration_seconds: Math.min(30, Math.max(1, seconds)), prompt_influence: 0.5, loop: true }),
+  });
+  if (!res.ok) {
+    const reason = await reasonOf(res);
+    if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 409 && res.status !== 429) {
+      throw new ProviderRejectedError(`ElevenLabs afviste rumlyden (${res.status})${reason}${planHint(reason)}`, res.status);
+    }
+    throw new Error(`ElevenLabs svarede ${res.status}${reason}`);
+  }
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (bytes.byteLength < 100) throw new Error('ElevenLabs returnerede ingen lyd');
+  return { bytes, mime: 'audio/mpeg' };
+}
+
 export async function listVoices(apiKey: string, fetchFn: typeof fetch = fetch): Promise<{ voices: Voice[]; freePlan: boolean }> {
   const res = await fetchFn(`${BASE}/v1/voices`, { headers: { 'xi-api-key': apiKey } });
   if (!res.ok) throw new Error(`ElevenLabs svarede ${res.status}${await reasonOf(res)}`);

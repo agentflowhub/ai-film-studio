@@ -12,14 +12,16 @@
 
 import { isOrgMember } from '../_shared/db.ts';
 import { apiError, errorText, json, log } from '../_shared/http.ts';
-import { planProject, referencePrompt, type PackageItem } from '../_shared/plan.ts';
+import { ambiencePrompt, planProject, referencePrompt, type PackageItem } from '../_shared/plan.ts';
 import { sha256Hex } from '../_shared/prompt.ts';
 import { createRegistry } from '../_shared/providers/registry.ts';
 import { loadPlanInput, requireProjectMember } from '../_shared/repo.ts';
 import { serve } from '../_shared/runtime.ts';
 import { ProductionStartRequestSchema, type ProductionItem } from '../_shared/schemas.ts';
 
-const TASK_TYPE = { reference: 'asset.master_generate', start_frame: 'frame.generate', video: 'video.generate', dialogue: 'dialogue.generate' } as const;
+const TASK_TYPE = { reference: 'asset.master_generate', start_frame: 'frame.generate', video: 'video.generate', dialogue: 'dialogue.generate', ambience: 'ambience.generate' } as const;
+// Mastere og rumlyd hører til en aktiv-version; resten til et shot.
+const onAsset = (i: ProductionItem): i is Extract<ProductionItem, { asset_version_id: string }> => i.slot === 'reference' || i.slot === 'ambience';
 
 serve('production-start', ProductionStartRequestSchema, async ({ admin, userId, body, env }) => {
   const project = await requireProjectMember(admin, body.project_id, userId);
@@ -31,13 +33,13 @@ serve('production-start', ProductionStartRequestSchema, async ({ admin, userId, 
   if (existing.data) return json({ batch_task_id: existing.data.id, replayed: true, ...(existing.data.result ?? {}) });
 
   const registry = createRegistry(env);
-  const choices = Object.fromEntries(body.items.flatMap((i) => (i.slot !== 'reference' && i.choice ? [[`${i.shot_id}:${i.slot}`, i.choice]] : [])));
+  const choices = Object.fromEntries(body.items.flatMap((i) => (!onAsset(i) && i.choice ? [[`${i.shot_id}:${i.slot}`, i.choice]] : [])));
   const input = await loadPlanInput(admin, project, registry, choices);
   const plan = await planProject(input);
 
-  const eligible = [...plan.packages.masters, ...plan.packages.frames, ...plan.packages.lines, ...plan.packages.videos];
+  const eligible = [...plan.packages.masters, ...plan.packages.frames, ...plan.packages.lines, ...plan.packages.videos, ...plan.packages.sounds];
   const match = (i: ProductionItem): PackageItem | undefined =>
-    eligible.find((e) => e.slot === i.slot && (i.slot === 'reference' ? e.assetVersionId === i.asset_version_id : e.shotId === i.shot_id));
+    eligible.find((e) => e.slot === i.slot && (onAsset(i) ? e.assetVersionId === i.asset_version_id : e.shotId === i.shot_id));
   const chosen = body.items.map((i) => ({ item: i, pkg: match(i) }));
   const notReady = chosen.filter((c) => !c.pkg);
   if (notReady.length) return apiError('not_ready', 409, { items: notReady.map((c) => c.item) });
@@ -76,7 +78,7 @@ serve('production-start', ProductionStartRequestSchema, async ({ admin, userId, 
         .from('tasks')
         .insert({
           org_id: project.org_id, project_id: project.id, type: TASK_TYPE[item.slot], status: 'approved', parent_task_id: batch.data.id,
-          idempotency_key: `${body.idempotency_key}:${item.slot}:${item.slot === 'reference' ? item.asset_version_id : item.shot_id}`,
+          idempotency_key: `${body.idempotency_key}:${item.slot}:${onAsset(item) ? item.asset_version_id : item.shot_id}`,
           payload: item, created_by: userId,
         })
         .select('id')
@@ -85,10 +87,10 @@ serve('production-start', ProductionStartRequestSchema, async ({ admin, userId, 
 
       let prompt: string, hash: string, target: Record<string, string>, specVersion: number | null = null;
       let voiceId: string | null = null;
-      if (item.slot === 'reference') {
+      if (onAsset(item)) {
         const asset = input.assets.find((a) => a.versions.some((v) => v.id === item.asset_version_id))!;
         const version = asset.versions.find((v) => v.id === item.asset_version_id)!;
-        prompt = referencePrompt(asset, version, input.dna);
+        prompt = item.slot === 'reference' ? referencePrompt(asset, version, input.dna) : ambiencePrompt(asset, version);
         hash = await sha256Hex(prompt);
         target = { asset_version_id: version.id };
       } else {

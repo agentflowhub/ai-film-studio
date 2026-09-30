@@ -17,6 +17,7 @@ type Slot = GenerationRow['slot'];
 
 const GROUPS: { slot: Slot; title: string; hint?: string }[] = [
   { slot: 'reference', title: 'Karakterer og steder' },
+  { slot: 'ambience', title: 'Rumlyd', hint: 'Lyt efter, om det lyder som stedet — og at der ikke er musik, tale eller pludselige lyde.' },
   { slot: 'start_frame', title: 'Startframes', hint: 'Tjek ansigter, hænder og hvilken vej telefoner vender.' },
   { slot: 'dialogue', title: 'Replikker', hint: 'Lyt efter udtale og tone.' },
   { slot: 'video', title: 'Videoer', hint: 'Hold musen over for at se klippet. Klik for stor visning med lyd — tjek at ansigterne holder, og at munden følger talen.' },
@@ -28,7 +29,8 @@ function reviewLabel(d: FilmData, g: GenerationRow): string {
     const what = g.slot === 'video' ? (s?.dialogue && s.dialogue_mode !== 'voiceover' ? 'talende video' : 'video') : g.slot === 'dialogue' ? (s?.dialogue_mode === 'voiceover' ? 'voiceover' : 'replik') : 'startframe';
     return `${s?.code ?? 'Shot'} · ${what}`;
   }
-  return d.assets.find((a) => a.asset_versions.some((v) => v.id === g.asset_version_id))?.name ?? 'Reference';
+  const name = d.assets.find((a) => a.asset_versions.some((v) => v.id === g.asset_version_id))?.name ?? 'Reference';
+  return g.slot === 'ambience' ? `${name} · rumlyd` : name;
 }
 
 export function ReviewQueue({ d }: { d: FilmData }) {

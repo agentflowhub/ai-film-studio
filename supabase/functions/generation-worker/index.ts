@@ -16,6 +16,7 @@ import { adminClient, type Admin } from '../_shared/db.ts';
 import { corsHeaders, json, log } from '../_shared/http.ts';
 import { sha256Bytes } from '../_shared/prompt.ts';
 import { decideAfterPoll, MAX_ATTEMPTS_PER_GENERATION } from '../_shared/production.ts';
+import { AMBIENCE_SECONDS } from '../_shared/providers/catalog.ts';
 import { createRegistry, type Registry } from '../_shared/providers/registry.ts';
 import { simulatedFile } from '../_shared/providers/simulator.ts';
 import { ProviderRejectedError, type GenerationRequest } from '../_shared/providers/types.ts';
@@ -28,7 +29,7 @@ interface Gen {
   id: string;
   org_id: string;
   project_id: string;
-  slot: 'reference' | 'start_frame' | 'video' | 'dialogue';
+  slot: 'reference' | 'start_frame' | 'video' | 'dialogue' | 'ambience';
   shot_id: string | null;
   asset_version_id: string | null;
   version: number;
@@ -59,6 +60,8 @@ async function buildRequest(admin: Admin, g: Gen): Promise<GenerationRequest> {
   const req: GenerationRequest = { prompt: g.input.prompt, referenceUrls: [], aspectRatio: '16:9' };
   // Replik: selve teksten og talerens stemme — intet billede.
   if (g.slot === 'dialogue') return { ...req, voiceId: g.input.voice_id };
+  // Rumlyd: kun beskrivelsen og længden.
+  if (g.slot === 'ambience') return { ...req, durationSeconds: AMBIENCE_SECONDS };
   if (g.slot === 'reference') {
     const refs = await admin.from('asset_references').select('media(storage_path)').eq('asset_version_id', g.asset_version_id!);
     if (refs.error) throw refs.error;
@@ -126,8 +129,8 @@ async function submitAttempt(admin: Admin, registry: Registry, g: Gen, attemptNo
   } else {
     try {
       const request = await buildRequest(admin, g);
-      if (g.slot === 'dialogue' && adapter.run) {
-        // Tale svarer med det samme: gem lyden og afslut uden et job, der skal følges.
+      if ((g.slot === 'dialogue' || g.slot === 'ambience') && adapter.run) {
+        // Tale og rumlyd svarer med det samme: gem lyden og afslut uden et job, der skal følges.
         const file = await adapter.run(target.model, request, `${g.id}:${attemptNo}`);
         await admin.from('generation_attempts').update({ status: 'running', started_at: new Date().toISOString() }).eq('id', ins.data.id);
         await finishSuccess(admin, registry, g, { id: ins.data.id, attempt: attemptNo, provider: target.provider, model: target.model }, file);

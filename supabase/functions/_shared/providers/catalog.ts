@@ -59,6 +59,16 @@ export const ELEVENLABS_MODELS: ModelInfo[] = [
   },
 ];
 
+// ElevenLabs lydeffekter: rumlyd pr. location ud fra en beskrivelse. Et klip på
+// 30 sek. (modellens maksimum), som gentages under længere forløb.
+export const ELEVENLABS_SOUND_MODELS: ModelInfo[] = [
+  {
+    provider: 'elevenlabs', model: 'eleven_text_to_sound_v2', label: 'ElevenLabs lydeffekter (rumlyd)',
+    capabilities: ['text_to_sound'], maxReferenceImages: 0, priceCents: 150, quality: 3,
+  },
+];
+export const AMBIENCE_SECONDS = 30;
+
 export interface ProviderSettings {
   openai: {
     // Modellen, der styrer Responses-kaldet og kalder billedværktøjet. Selve

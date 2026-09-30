@@ -106,7 +106,7 @@ export interface AssetRow {
 
 export interface GenerationRow {
   id: string;
-  slot: 'reference' | 'start_frame' | 'video' | 'dialogue';
+  slot: 'reference' | 'start_frame' | 'video' | 'dialogue' | 'ambience';
   shot_id: string | null;
   asset_version_id: string | null;
   version: number;
@@ -170,7 +170,9 @@ export interface ShotPlanView {
 
 export interface PlanResponse {
   shots: ShotPlanView[];
-  packages: { masters: PackageItem[]; frames: PackageItem[]; lines: PackageItem[]; videos: PackageItem[] };
+  packages: { masters: PackageItem[]; frames: PackageItem[]; lines: PackageItem[]; videos: PackageItem[]; sounds?: PackageItem[] };
+  // Rumlyd pr. location, der bruges i et shot.
+  sounds?: { assetId: string; name: string; assetVersionId: string; status: SlotStatus; generationId: string | null }[];
   totals: { masters: number; frames: number; lines: number; videos: number };
   blocked: { shotId: string; code: string; reason: string }[];
   budget: Budget;

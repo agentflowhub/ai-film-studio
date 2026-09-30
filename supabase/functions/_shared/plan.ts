@@ -35,7 +35,7 @@ export interface PlanAsset {
 
 export interface PlanGeneration {
   id: string;
-  slot: 'reference' | 'start_frame' | 'video' | 'dialogue';
+  slot: 'reference' | 'start_frame' | 'video' | 'dialogue' | 'ambience';
   version: number;
   status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
   review: 'pending' | 'approved' | 'rejected' | null;
@@ -79,6 +79,8 @@ export interface PlanInput {
   shots: PlanShot[];
   models: ModelInfo[];
   allowSimulated: boolean;
+  // Rumlyd-genereringer (slot 'ambience') for filmens locations.
+  ambience?: PlanGeneration[];
   choices?: Record<string, string | null | undefined>;
 }
 
@@ -106,7 +108,7 @@ export interface ShotPlan {
 }
 
 export interface PackageItem {
-  slot: 'reference' | 'start_frame' | 'video' | 'dialogue';
+  slot: 'reference' | 'start_frame' | 'video' | 'dialogue' | 'ambience';
   shotId?: string;
   assetVersionId?: string;
   label: string;
@@ -117,9 +119,19 @@ export interface PackageItem {
   fallback: { provider: string; model: string } | null;
 }
 
+export interface SoundPlan {
+  assetId: string;
+  name: string;
+  assetVersionId: string;
+  status: SlotStatus;
+  generationId: string | null;
+}
+
 export interface ProjectPlan {
   shots: ShotPlan[];
-  packages: { masters: PackageItem[]; frames: PackageItem[]; lines: PackageItem[]; videos: PackageItem[] };
+  // Rumlyd pr. location, der bruges i et shot.
+  sounds: SoundPlan[];
+  packages: { masters: PackageItem[]; frames: PackageItem[]; lines: PackageItem[]; videos: PackageItem[]; sounds: PackageItem[] };
   blocked: { shotId: string; code: string; reason: string }[];
 }
 
@@ -142,11 +154,17 @@ export function referencePrompt(asset: PlanAsset, v: PlanAssetVersion, dna: Plan
   return `Referenceark for ${asset.kind} ${asset.code} v${v.version} — ${asset.name}: ${attrs}. Neutral baggrund, flere vinkler, ensartet lys.${style}`;
 }
 
+// Rumlyd til en location: kun baggrundslyd, der kan ligge under replikker.
+export function ambiencePrompt(asset: PlanAsset, v: PlanAssetVersion): string {
+  const attrs = Object.entries(v.attributes).sort(([a], [b]) => a.localeCompare(b)).map(([k, val]) => `${k.toLowerCase()}: ${val}`).join('; ');
+  return `Continuous ambient room tone for a film scene at ${asset.name}${attrs ? ` (${attrs})` : ''}. Natural, quiet background ambience only, recorded as room tone: no music, no speech, no sudden or loud sounds.`;
+}
+
 export async function planProject(input: PlanInput): Promise<ProjectPlan> {
   const assetById = new Map(input.assets.map((a) => [a.id, a]));
   const activeRules = input.rules.filter((r) => r.enabled).map((r) => r.text);
   const shots: ShotPlan[] = [];
-  const packages: ProjectPlan['packages'] = { masters: [], frames: [], lines: [], videos: [] };
+  const packages: ProjectPlan['packages'] = { masters: [], frames: [], lines: [], videos: [], sounds: [] };
   const blocked: ProjectPlan['blocked'] = [];
 
   for (const s of input.shots) {
@@ -284,7 +302,28 @@ export async function planProject(input: PlanInput): Promise<ProjectPlan> {
     });
   }
 
-  return { shots, packages, blocked };
+  // Rumlyd: én pr. location, der bruges i et shot, bygget på locationens master.
+  const sounds: SoundPlan[] = [];
+  const used = new Set(input.shots.flatMap((s) => s.links.map((l) => l.asset_id)));
+  for (const a of input.assets) {
+    if (a.kind !== 'location' || !used.has(a.id) || !a.master_version_id) continue;
+    const v = a.versions.find((x) => x.id === a.master_version_id);
+    if (!v) continue;
+    const hash = await sha256Hex(ambiencePrompt(a, v));
+    const g = (input.ambience ?? []).filter((x) => x.asset_version_id === v.id).sort((x, y) => y.version - x.version)[0] ?? null;
+    const status = slotStatus(g, hash);
+    sounds.push({ assetId: a.id, name: a.name, assetVersionId: v.id, status, generationId: g?.id ?? null });
+    if (!['draft', 'rejected', 'outdated', 'failed'].includes(status) || input.stage !== 'production') continue;
+    const r = recommend(input.models, { slot: 'ambience', referenceImages: 0, hasCharacters: false }, { allowSimulated: input.allowSimulated });
+    if (!r.pick) continue;
+    packages.sounds.push({
+      slot: 'ambience', assetVersionId: v.id, label: `${a.name} · rumlyd`, costCents: Math.max(r.pick.priceCents, r.fallback?.priceCents ?? 0),
+      pick: { provider: r.pick.provider, model: r.pick.model, label: r.pick.label },
+      fallback: r.fallback ? { provider: r.fallback.provider, model: r.fallback.model } : null,
+    });
+  }
+
+  return { shots, sounds, packages, blocked };
 }
 
 export const packageTotal = (items: PackageItem[]) => items.reduce((n, i) => n + i.costCents, 0);

@@ -11,6 +11,7 @@ export const TASK_TYPES = [
   'frame.generate',
   'video.generate',
   'dialogue.generate',
+  'ambience.generate',
   'production.batch',
 ] as const;
 export type TaskType = (typeof TASK_TYPES)[number];
@@ -19,7 +20,7 @@ export type TaskType = (typeof TASK_TYPES)[number];
 // eller stemmeleverandør. De kræver ALTID et ja (på opgaven eller dens batch), før de
 // kører — uanset hvor mange gange samme type er godkendt før. Databasen
 // håndhæver det samme (generation_gate i 002_produktion.sql).
-export const COST_BEARING_TASK_TYPES: readonly string[] = ['asset.master_generate', 'frame.generate', 'video.generate', 'dialogue.generate'];
+export const COST_BEARING_TASK_TYPES: readonly string[] = ['asset.master_generate', 'frame.generate', 'video.generate', 'dialogue.generate', 'ambience.generate'];
 
 export function requiresApprovalBeforeExecution(taskType: string): boolean {
   return COST_BEARING_TASK_TYPES.includes(taskType);

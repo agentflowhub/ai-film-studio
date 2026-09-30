@@ -15,6 +15,7 @@ export const SIMULATOR_MODELS: ModelInfo[] = [
   { provider: 'simulator', model: 'video-a', label: 'Simuleret videomodel A', capabilities: ['image_to_video'], maxReferenceImages: 4, minSeconds: 3, maxSeconds: 10, movements: ['static', 'pan', 'tilt', 'handheld', 'dolly', 'optical_zoom'], priceCents: 2800, quality: 3, simulated: true },
   { provider: 'simulator', model: 'speak', label: 'Simuleret talende video', capabilities: ['speech_to_video'], maxReferenceImages: 1, minSeconds: 1, maxSeconds: 15, priceCents: 900, quality: 3, simulated: true },
   { provider: 'simulator', model: 'tts', label: 'Simuleret stemme', capabilities: ['text_to_speech'], maxReferenceImages: 0, priceCents: 100, quality: 3, simulated: true },
+  { provider: 'simulator', model: 'sfx', label: 'Simuleret rumlyd', capabilities: ['text_to_sound'], maxReferenceImages: 0, priceCents: 100, quality: 3, simulated: true },
   { provider: 'simulator-b', model: 'video-b', label: 'Simuleret videomodel B', capabilities: ['image_to_video'], maxReferenceImages: 2, minSeconds: 3, maxSeconds: 8, movements: ['static', 'pan', 'handheld'], priceCents: 2200, quality: 2, simulated: true },
 ];
 
@@ -44,8 +45,9 @@ export function createSimulator(id: 'simulator' | 'simulator-b', now: () => numb
     async cancel() {
       return true;
     },
-    // Tale svarer med det samme: et sekunds stilhed pr. ord, højst 15 sek.
-    async run(_model, req) {
+    // Tale og rumlyd svarer med det samme: stilhed som pladsholder.
+    async run(model, req) {
+      if (model === 'sfx') return { bytes: silentWav(10), mime: 'audio/wav' };
       if (!req.voiceId) throw new Error('replikken har ingen stemme');
       return { bytes: silentWav(Math.min(15, Math.max(1, req.prompt.split(/\s+/).length * 0.4))), mime: 'audio/wav' };
     },

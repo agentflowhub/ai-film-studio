@@ -29,7 +29,7 @@ describe('godkendelse før storyboard', () => {
   });
 
   it('kræver ja før alle betalte generationer — og kun dem', () => {
-    expect([...COST_BEARING_TASK_TYPES].sort()).toEqual(['asset.master_generate', 'dialogue.generate', 'frame.generate', 'video.generate']);
+    expect([...COST_BEARING_TASK_TYPES].sort()).toEqual(['ambience.generate', 'asset.master_generate', 'dialogue.generate', 'frame.generate', 'video.generate']);
     for (const t of COST_BEARING_TASK_TYPES) expect(requiresApprovalBeforeExecution(t)).toBe(true);
     expect(requiresApprovalBeforeExecution('brief.generate')).toBe(false);
     expect(requiresApprovalBeforeExecution('storyboard.generate')).toBe(false);

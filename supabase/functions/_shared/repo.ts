@@ -4,7 +4,7 @@
 
 import type { ContinuityRule } from './continuity.ts';
 import type { Admin } from './db.ts';
-import type { PlanAsset, PlanInput, PlanShot } from './plan.ts';
+import type { PlanAsset, PlanGeneration, PlanInput, PlanShot } from './plan.ts';
 import type { Registry } from './providers/registry.ts';
 
 export interface ProjectRow {
@@ -44,6 +44,9 @@ export async function loadPlanInput(
       .eq('project_id', project.id),
   ]);
   for (const r of [dna, rules, assets]) if (r.error) throw r.error;
+  // Rumlyd hører til en location-version, ikke et shot.
+  const amb = await admin.from('generations').select('id, slot, version, status, review, input_hash, asset_version_id').eq('project_id', project.id).eq('slot', 'ambience');
+  if (amb.error) throw amb.error;
 
   const storyboardId = await currentStoryboardId(admin, project.id);
   let shotRows: Raw[] = [];
@@ -132,6 +135,10 @@ export async function loadPlanInput(
     shots: planShots,
     models: registry.models,
     allowSimulated: registry.allowSimulated,
+    ambience: amb.data.map((g) => ({
+      id: g.id as string, slot: 'ambience' as const, version: g.version as number, status: g.status as PlanGeneration['status'],
+      review: g.review as PlanGeneration['review'], input_hash: g.input_hash as string, asset_version_id: g.asset_version_id as string,
+    })),
     choices,
   };
 }

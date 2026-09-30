@@ -29,11 +29,13 @@ serve('production-plan', ProductionPlanRequestSchema, async ({ admin, userId, bo
       },
     })),
     packages: plan.packages,
+    sounds: plan.sounds,
     totals: {
       masters: packageTotal(plan.packages.masters),
       frames: packageTotal(plan.packages.frames),
       lines: packageTotal(plan.packages.lines),
       videos: packageTotal(plan.packages.videos),
+      sounds: packageTotal(plan.packages.sounds),
     },
     blocked: plan.blocked,
     budget: budget.data,

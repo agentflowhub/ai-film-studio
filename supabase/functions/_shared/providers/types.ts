@@ -2,7 +2,7 @@
 // ikke kende modellerne; routeren (router.ts) vælger ud fra shottets behov.
 
 // speech_to_video: video fra en startframe OG en lydfil, hvor munden følger lyden.
-export type Capability = 'text_to_image' | 'image_to_image' | 'image_to_video' | 'text_to_video' | 'text_to_speech' | 'speech_to_video';
+export type Capability = 'text_to_image' | 'image_to_image' | 'image_to_video' | 'text_to_video' | 'text_to_speech' | 'speech_to_video' | 'text_to_sound';
 
 export interface ModelInfo {
   provider: string;

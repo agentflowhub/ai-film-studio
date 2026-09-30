@@ -5,7 +5,7 @@
 import type { Capability, ModelInfo } from './types.ts';
 
 export interface Need {
-  slot: 'reference' | 'start_frame' | 'video' | 'dialogue';
+  slot: 'reference' | 'start_frame' | 'video' | 'dialogue' | 'ambience';
   // Video: shottet har en godkendt replik, som munden skal følge.
   speech?: boolean;
   durationSeconds?: number;
@@ -29,11 +29,12 @@ const MOVEMENT_LABEL: Record<string, string> = {
 
 const WHY_NOT: Record<Capability, string> = {
   text_to_image: 'kan ikke lave billeder', image_to_image: 'kan ikke lave billeder', image_to_video: 'kan ikke lave video fra en startframe',
-  text_to_video: 'kan ikke lave video', text_to_speech: 'kan ikke lave tale', speech_to_video: 'kan ikke lave talende video',
+  text_to_video: 'kan ikke lave video', text_to_speech: 'kan ikke lave tale', speech_to_video: 'kan ikke lave talende video', text_to_sound: 'kan ikke lave rumlyd',
 };
 
 function capabilityFor(need: Need): Capability {
   if (need.slot === 'dialogue') return 'text_to_speech';
+  if (need.slot === 'ambience') return 'text_to_sound';
   if (need.slot === 'video') return need.speech ? 'speech_to_video' : 'image_to_video';
   return 'text_to_image';
 }
@@ -53,7 +54,7 @@ export function recommend(
     else if (need.durationSeconds && m.maxSeconds && need.durationSeconds > m.maxSeconds) why = `højst ${m.maxSeconds} sek.`;
     else if (need.durationSeconds && m.minSeconds && need.durationSeconds < m.minSeconds) why = `mindst ${m.minSeconds} sek.`;
     else if (need.movement && m.movements && !m.movements.includes(need.movement)) why = `understøtter ikke ${MOVEMENT_LABEL[need.movement] ?? need.movement}`;
-    else if (need.slot !== 'dialogue' && need.referenceImages > m.maxReferenceImages) why = `tager højst ${m.maxReferenceImages} referencebilleder`;
+    else if (need.slot !== 'dialogue' && need.slot !== 'ambience' && need.referenceImages > m.maxReferenceImages) why = `tager højst ${m.maxReferenceImages} referencebilleder`;
     if (why) excluded.push({ model: m, why });
     else candidates.push(m);
   }

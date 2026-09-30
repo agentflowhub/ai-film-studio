@@ -256,6 +256,7 @@ export const ShotContinuityRequestSchema = z.discriminatedUnion('action', [
 
 export const ProductionItemSchema = z.discriminatedUnion('slot', [
   z.object({ slot: z.literal('reference'), asset_version_id: z.uuid() }),
+  z.object({ slot: z.literal('ambience'), asset_version_id: z.uuid() }),
   z.object({ slot: z.enum(['start_frame', 'video', 'dialogue']), shot_id: z.uuid(), choice: z.string().max(120).nullable().optional() }),
 ]);
 export type ProductionItem = z.infer<typeof ProductionItemSchema>;
