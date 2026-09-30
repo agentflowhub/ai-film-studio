@@ -2,7 +2,8 @@
 // product.config.json — aldrig skrevet direkte her.
 
 import type { ReactNode } from 'react';
-import { useFilm } from '../lib/data.ts';
+import { useFilm, type FilmData } from '../lib/data.ts';
+import { filmFlow } from '../lib/flow.ts';
 import { PRODUCT_NAME, PRODUCT_TAGLINE } from '../lib/product.ts';
 import { href, type Route } from '../lib/router.ts';
 import { supabase } from '../lib/supabase.ts';
@@ -89,6 +90,31 @@ export function FilmHeader({ route, actions }: { route: Route & { filmId: string
         ))}
       </nav>
       {data.plan?.simulated && <div className="simulated">{texts.common.simulated}</div>}
+      <FlowBar d={data} />
     </header>
+  );
+}
+
+// Filmens trin fra brief til færdig film, og det ene næste skridt. Står på
+// alle filmens sider, så man altid kan se, hvor man er nået til.
+function FlowBar({ d }: { d: FilmData }) {
+  const { steps, next } = filmFlow(d);
+  return (
+    <div className="flowbar">
+      <ol className="flowsteps" aria-label="Filmens trin">
+        {steps.map((s, i) => (
+          <li key={s.key} className={s.state}>
+            <a href={href(s.to)} aria-current={s.state === 'now' ? 'step' : undefined}>
+              <span className="flow-dot">{s.state === 'done' ? '✓' : i + 1}</span>
+              <span className="flow-text"><span>{s.label}</span>{s.detail && <small>{s.detail}</small>}</span>
+            </a>
+          </li>
+        ))}
+      </ol>
+      <a className={`flow-next ${next.kind}`} href={href(next.to)}>
+        <span className="muted small">{next.kind === 'working' ? 'I gang' : 'Næste skridt'}</span>
+        <strong>{next.text}{next.kind === 'working' ? '' : ' →'}</strong>
+      </a>
+    </div>
   );
 }
