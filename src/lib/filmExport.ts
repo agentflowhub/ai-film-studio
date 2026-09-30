@@ -41,7 +41,13 @@ export type ExportPart = (
   | { kind: 'video'; url: string; seconds: number }
   | { kind: 'still'; url: string; seconds: number }
   | { kind: 'black'; seconds: number }
-) & { line?: ExportLine | null };
+) & {
+  line?: ExportLine | null;
+  // Locationens godkendte rumlyd; `ambienceKey` er locationen, så rumlyden
+  // fortsætter uden hop, når flere shots i træk foregår samme sted.
+  ambienceUrl?: string | null;
+  ambienceKey?: string | null;
+};
 
 export type Transition = 'cut' | 'soft';
 
@@ -68,6 +74,10 @@ export const TAGLINE_SECONDS = 3;
 export const ENDCARD_SECONDS = 3.5;
 // Klippenes egen lyd, mens en voiceover taler.
 export const DUCK_VOLUME = 0.3;
+// Rumlyden ligger lavt under alt andet.
+export const AMBIENCE_VOLUME = 0.35;
+// En voiceover, der må stoppe før tid, tones ud over denne tid.
+export const VOICE_FADE = 0.15;
 
 const SILENCE = ['-f', 'lavfi', '-i', `anullsrc=r=${RATE}:cl=stereo`];
 const MEZZANINE = ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '12', '-pix_fmt', 'yuv420p', '-c:a', 'pcm_s16le'];
@@ -86,8 +96,12 @@ export function frameCount(seconds: number, fps: number): number {
   return Math.max(1, Math.round(seconds * fps));
 }
 
+const sec = (n: number) => n.toFixed(3);
+
 // ffmpeg-argumenter, der gør ét shot til et mellemklip i filmens format.
-export function clipArgs(part: ExportPart, input: string, output: string, o: { hasAudio: boolean; seconds: number; fps: number; transition: Transition }): string[] {
+// Med `ambience` lægges locationens rumlyd under klippets egen lyd, startet
+// `offset` sekunder inde, så den fortsætter fra forrige shot samme sted.
+export function clipArgs(part: ExportPart, input: string, output: string, o: { hasAudio: boolean; seconds: number; fps: number; transition: Transition; ambience?: { file: string; offset: number } | null }): string[] {
   const frames = frameCount(o.seconds, o.fps);
   const exact = frames / o.fps;
   const samples = Math.round(exact * RATE);
@@ -101,13 +115,16 @@ export function clipArgs(part: ExportPart, input: string, output: string, o: { h
   const vFade = fade ? `,fade=t=in:d=${fade.toFixed(3)},fade=t=out:st=${(exact - fade).toFixed(3)}:d=${fade.toFixed(3)}` : '';
   const aFade = Math.max(fade, 0.02);
   const v = `[0:v]scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=decrease,pad=${WIDTH}:${HEIGHT}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=${o.fps},format=yuv420p,trim=end_frame=${frames},setpts=PTS-STARTPTS${vFade}[v]`;
-  const a = `${audio}aresample=${RATE},aformat=sample_rates=${RATE}:channel_layouts=stereo,apad,atrim=end_sample=${samples},asetpts=PTS-STARTPTS,afade=t=in:d=${aFade.toFixed(3)},afade=t=out:st=${(exact - aFade).toFixed(3)}:d=${aFade.toFixed(3)}[a]`;
-  return [...source, ...SILENCE, '-filter_complex', `${v};${a}`, '-map', '[v]', '-map', '[a]', '-r', String(o.fps), ...MEZZANINE, output];
+  const fmt = `aresample=${RATE},aformat=sample_rates=${RATE}:channel_layouts=stereo`;
+  const tail = `atrim=end_sample=${samples},asetpts=PTS-STARTPTS,afade=t=in:d=${aFade.toFixed(3)},afade=t=out:st=${(exact - aFade).toFixed(3)}:d=${aFade.toFixed(3)}[a]`;
+  const amb = o.ambience ? ['-stream_loop', '-1', '-ss', sec(o.ambience.offset), '-i', o.ambience.file] : [];
+  const a = o.ambience
+    ? `${audio}${fmt},apad[own];[2:a]${fmt},volume=${AMBIENCE_VOLUME}[amb];[own][amb]amix=inputs=2:duration=first:normalize=0,${tail}`
+    : `${audio}${fmt},apad,${tail}`;
+  return [...source, ...SILENCE, ...amb, '-filter_complex', `${v};${a}`, '-map', '[v]', '-map', '[a]', '-r', String(o.fps), ...MEZZANINE, output];
 }
 
 export interface Timed { file: string; start: number; end: number }
-
-const sec = (n: number) => n.toFixed(3);
 
 // Samlingen tæller tiden forfra ud fra antal billeder og lydprøver i stedet
 // for mellemklippenes tidsstempler, som containeren runder til hele
@@ -126,9 +143,11 @@ export function finalArgs(list: string, output: string, fps: number, voices: Tim
   // Lyd: klippenes lyd dæmpes, mens en voiceover taler, og voiceoverne blandes ind.
   const duck = voices.length ? `,volume='if(${voices.map((v) => `between(t,${sec(v.start)},${sec(v.end)})`).join('+')},${DUCK_VOLUME},1)':eval=frame` : '';
   graph.push(`[0:a]asetpts=N/SR/TB${duck}[a0]`);
+  // Hver voiceover skæres til sit vindue og tones kort ud, hvis den stoppes før tid.
   voices.forEach((v, i) => {
     const ms = Math.round(v.start * 1000);
-    graph.push(`[${1 + i}:a]aresample=${RATE},aformat=sample_rates=${RATE}:channel_layouts=stereo,adelay=${ms}|${ms}[vo${i}]`);
+    const len = Math.max(0.1, v.end - v.start);
+    graph.push(`[${1 + i}:a]aresample=${RATE},aformat=sample_rates=${RATE}:channel_layouts=stereo,atrim=0:${sec(len)},afade=t=out:st=${sec(Math.max(0, len - VOICE_FADE))}:d=${sec(Math.min(VOICE_FADE, len))},adelay=${ms}|${ms}[vo${i}]`);
   });
   const audioOut = voices.length ? 'a' : 'a0';
   if (voices.length) graph.push(`[a0]${voices.map((_, i) => `[vo${i}]`).join('')}amix=inputs=${voices.length + 1}:duration=first:normalize=0[a]`);
@@ -157,6 +176,31 @@ export function captionChunks(text: string, seconds: number, maxChars = 76): { t
     const out = { text: c, start: t, end: t + d };
     t += d;
     return out;
+  });
+}
+
+// Hvor længe en voiceover fra shot `i` må tale: til den er færdig, men aldrig
+// ind i et senere shot med sin egen replik — så lyder det, som om den forkerte
+// person taler. Returnerer sluttidspunktet på tidslinjen.
+export function voiceoverEnd(i: number, seconds: number, times: { start: number; end: number }[], hasLine: boolean[]): number {
+  const start = times[i]!.start;
+  let end = start + seconds;
+  for (let j = i + 1; j < times.length; j++) {
+    if (hasLine[j]) { end = Math.min(end, times[j]!.start); break; }
+  }
+  return Math.min(end, times.at(-1)!.end);
+}
+
+// Hvor langt inde i rumlyden hvert shot starter: den fortsætter, så længe
+// shotsene foregår samme sted, og starter forfra ved et nyt sted.
+export function ambienceOffsets(keys: (string | null | undefined)[], seconds: number[], lengths: (number | null)[]): number[] {
+  let run = 0;
+  return keys.map((k, i) => {
+    if (i === 0 || !k || k !== keys[i - 1]) run = 0;
+    const len = lengths[i] ?? 0;
+    const off = len > 0 ? run % len : 0;
+    run += seconds[i]!;
+    return off;
   });
 }
 
@@ -249,12 +293,27 @@ export async function exportFilm(input: ExportPart[], o: ExportOptions, onProgre
     }
     fps ||= 24;
 
+    // Rumlyd: hver location hentes én gang; offset gør, at den fortsætter
+    // uden hop hen over shots samme sted.
+    const ambFiles = new Map<string, { file: string; seconds: number }>();
+    for (const part of parts) {
+      if (!part.ambienceUrl || ambFiles.has(part.ambienceUrl)) continue;
+      const file = `amb${ambFiles.size}.mp3`;
+      await ff.writeFile(file, await fetchFile(part.ambienceUrl));
+      const d = durationOf(await probe(file));
+      if (d) ambFiles.set(part.ambienceUrl, { file, seconds: d });
+    }
+    const exactSeconds = info.map((x) => frameCount(x.seconds, fps) / fps);
+    const offsets = ambienceOffsets(parts.map((p) => (p.ambienceUrl && ambFiles.has(p.ambienceUrl) ? p.ambienceKey ?? p.ambienceUrl : null)), exactSeconds, parts.map((p) => (p.ambienceUrl ? ambFiles.get(p.ambienceUrl)?.seconds ?? null : null)));
+
     const outs: string[] = [];
     for (const [i, part] of parts.entries()) {
       at = i;
       const { input, hasAudio, seconds } = info[i]!;
       const out = `c${i}.mkv`;
-      const code = await ff.exec(clipArgs(part, input, out, { hasAudio, seconds, fps, transition: o.transition }));
+      const amb = part.ambienceUrl ? ambFiles.get(part.ambienceUrl) : undefined;
+      const ambience = amb ? { file: amb.file, offset: offsets[i]! } : null;
+      const code = await ff.exec(clipArgs(part, input, out, { hasAudio, seconds, fps, transition: o.transition, ambience }));
       if (code !== 0) throw new Error(`shot ${i + 1} kunne ikke omkodes`);
       if (part.kind !== 'black') await ff.deleteFile(input);
       outs.push(out);
@@ -270,12 +329,20 @@ export async function exportFilm(input: ExportPart[], o: ExportOptions, onProgre
       await ff.writeFile(file, await o.render(c));
       overlays.push({ file, start, end: Math.min(end, filmEnd) });
     };
+    const hasLine = parts.map((p, i) => !!(p.line && info[i]!.line));
     for (const [i, part] of parts.entries()) {
       const line = info[i]!.line;
       if (!part.line || !line) continue;
       const start = times[i]!.start;
-      if (part.line.mode === 'voiceover') voices.push({ file: line.file, start, end: Math.min(start + line.seconds, filmEnd) });
-      if (o.captions) for (const c of captionChunks(part.line.text, line.seconds)) await card({ kind: 'caption', text: c.text }, start + c.start, start + c.end);
+      // En voiceover stopper, hvor et senere shot har sin egen replik.
+      const end = part.line.mode === 'voiceover' ? voiceoverEnd(i, line.seconds, times, hasLine) : Math.min(start + line.seconds, filmEnd);
+      if (part.line.mode === 'voiceover') voices.push({ file: line.file, start, end });
+      // Teksten følger det, der faktisk høres: stykker efter et stop vises ikke.
+      if (o.captions) {
+        for (const c of captionChunks(part.line.text, line.seconds)) {
+          if (start + c.start < end - 0.2) await card({ kind: 'caption', text: c.text }, start + c.start, Math.min(start + c.end, end));
+        }
+      }
     }
     const first = times[0]!;
     if (o.title) await card({ kind: 'title', title: o.title, subtitle: o.subtitle }, first.start, Math.min(first.end, TITLE_SECONDS));

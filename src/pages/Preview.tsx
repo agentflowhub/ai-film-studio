@@ -35,12 +35,15 @@ export function Preview({ filmId }: { filmId: string }) {
   const voice = useRef<HTMLAudioElement | null>(null);
   const line = data && shot ? lineFor(data, shot) : null;
   const voUrl = line?.mode === 'voiceover' ? line.url : null;
+  const hasLine = !!line;
   useEffect(() => {
-    if (!playing || !voUrl) return;
-    voice.current?.pause();
+    if (!playing) return;
+    // Et nyt shot med sin egen replik afbryder en voiceover, der stadig taler.
+    if (hasLine) voice.current?.pause();
+    if (!voUrl) return;
     voice.current = new Audio(voUrl);
     void voice.current.play().catch(() => undefined);
-  }, [playing, voUrl, i]);
+  }, [playing, voUrl, hasLine, i]);
   useEffect(() => {
     if (!playing) voice.current?.pause();
   }, [playing]);
@@ -94,17 +97,34 @@ function lineFor(d: FilmData, s: FilmData['shots'][number]): ExportLine | null {
   return { url, text: s.dialogue.trim(), mode: s.dialogue_mode === 'voiceover' ? 'voiceover' : 'on_camera' };
 }
 
+// Locationens godkendte rumlyd til shottet (den nyeste godkendte).
+function ambienceFor(d: FilmData, s: FilmData['shots'][number]): { url: string; key: string } | null {
+  for (const link of s.shot_assets) {
+    const a = d.assets.find((x) => x.id === link.asset_id && x.kind === 'location');
+    if (!a) continue;
+    const versions = new Set(a.asset_versions.map((v) => v.id));
+    const g = d.generations
+      .filter((x) => x.slot === 'ambience' && x.review === 'approved' && x.asset_version_id && versions.has(x.asset_version_id))
+      .sort((x, y) => y.version - x.version)[0];
+    const url = g?.media ? d.urls[g.media.storage_path] : null;
+    if (url) return { url, key: a.id };
+  }
+  return null;
+}
+
 // Et shot i den samlede film: det, Preview viser. En talende replik (on_camera)
 // ligger allerede i videoen; kun en voiceover lægges på — men begge får tekst.
 function partFor(d: FilmData, s: FilmData['shots'][number]): ExportPart {
   const seconds = Number(s.duration_seconds);
   const line = lineFor(d, s);
+  const amb = ambienceFor(d, s);
+  const sound = { ambienceUrl: amb?.url ?? null, ambienceKey: amb?.key ?? null };
   const v = s.approved_video_id ? outputFor(d, s, 'video') : null;
-  if (v?.url && v.gen.media?.mime.startsWith('video/')) return { kind: 'video', url: v.url, seconds, line };
+  if (v?.url && v.gen.media?.mime.startsWith('video/')) return { kind: 'video', url: v.url, seconds, line, ...sound };
   const f = outputFor(d, s, 'start_frame');
   // Uden godkendt video er der ingen læbesynk; replikken høres så som voiceover.
   const still = line ? { ...line, mode: 'voiceover' as const } : null;
-  return f?.url && f.gen.media?.mime.startsWith('image/') ? { kind: 'still', url: f.url, seconds, line: still } : { kind: 'black', seconds, line: still };
+  return f?.url && f.gen.media?.mime.startsWith('image/') ? { kind: 'still', url: f.url, seconds, line: still, ...sound } : { kind: 'black', seconds, line: still, ...sound };
 }
 
 function SaveFilm({ d, done }: { d: FilmData; done: number }) {

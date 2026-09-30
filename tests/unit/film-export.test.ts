@@ -2,7 +2,7 @@
 // billede og lyd i præcis samme længde, så samlingen ikke hakker.
 
 import { describe, expect, it } from 'vitest';
-import { captionChunks, clipArgs, clipSeconds, concatList, DUCK_VOLUME, durationOf, fileName, finalArgs, fpsOf, frameCount, hasAudioStream, timeline } from '../../src/lib/filmExport.ts';
+import { ambienceOffsets, captionChunks, voiceoverEnd, clipArgs, clipSeconds, concatList, DUCK_VOLUME, durationOf, fileName, finalArgs, fpsOf, frameCount, hasAudioStream, timeline } from '../../src/lib/filmExport.ts';
 
 const after = (args: string[], flag: string) => args[args.indexOf(flag) + 1]!;
 const opts = { hasAudio: true, seconds: 5, fps: 24, transition: 'cut' as const };
@@ -60,7 +60,7 @@ describe('voiceover og tekst i samlingen', () => {
 
   it('voiceoveren lægges ind fra sit shot og blandes med klippenes lyd', () => {
     expect(a.filter((x) => x === '-i')).toHaveLength(4);
-    expect(graph).toContain('[1:a]aresample=48000,aformat=sample_rates=48000:channel_layouts=stereo,adelay=6500|6500[vo0]');
+    expect(graph).toContain('[1:a]aresample=48000,aformat=sample_rates=48000:channel_layouts=stereo,atrim=0:4.500,afade=t=out:st=4.350:d=0.150,adelay=6500|6500[vo0]');
     expect(graph).toContain('[a0][vo0]amix=inputs=2:duration=first:normalize=0[a]');
     expect(a[a.lastIndexOf('-map') + 1]).toBe('[a]');
   });
@@ -131,5 +131,35 @@ describe('fil', () => {
     expect(fileName('Beboeren')).toBe('Beboeren.mp4');
     expect(fileName('Blå øer & Æbler!')).toBe('Blaa-oeer-Aebler.mp4');
     expect(fileName('???')).toBe('film.mp4');
+  });
+});
+
+describe('voiceover stopper ved næste replik', () => {
+  const times = [{ start: 0, end: 3 }, { start: 3, end: 4.5 }, { start: 4.5, end: 6 }, { start: 6, end: 9 }];
+  it('taler færdigt hen over dækbilleder uden replik', () => {
+    expect(voiceoverEnd(0, 5, times, [true, false, false, false])).toBe(5);
+  });
+  it('men stopper, hvor et senere shot har sin egen replik', () => {
+    expect(voiceoverEnd(0, 8, times, [true, false, true, false])).toBe(4.5);
+  });
+  it('og aldrig efter filmens slutning', () => {
+    expect(voiceoverEnd(2, 10, times, [false, false, true, false])).toBe(9);
+  });
+});
+
+describe('rumlyd', () => {
+  it('fortsætter samme sted og starter forfra ved et nyt sted', () => {
+    expect(ambienceOffsets(['k', 'k', 'o', 'k'], [3, 4, 2, 5], [30, 30, 30, 30])).toEqual([0, 3, 0, 0]);
+  });
+  it('gentages, når forløbet er længere end lydklippet', () => {
+    expect(ambienceOffsets(['k', 'k', 'k'], [20, 20, 5], [30, 30, 30])).toEqual([0, 20, 10]);
+  });
+  it('shots uden rumlyd får intet offset', () => {
+    expect(ambienceOffsets([null, 'k'], [3, 3], [null, 30])).toEqual([0, 0]);
+  });
+  it('lægges lavt under klippets egen lyd fra det rigtige sted', () => {
+    const a = clipArgs({ kind: 'video', url: 'u', seconds: 5 }, 'i', 'c.mkv', { ...opts, ambience: { file: 'amb0.mp3', offset: 7.25 } });
+    expect(a.slice(a.indexOf('-stream_loop'), a.indexOf('-stream_loop') + 6)).toEqual(['-stream_loop', '-1', '-ss', '7.250', '-i', 'amb0.mp3']);
+    expect(after(a, '-filter_complex')).toContain('[2:a]aresample=48000,aformat=sample_rates=48000:channel_layouts=stereo,volume=0.35[amb];[own][amb]amix=inputs=2');
   });
 });
