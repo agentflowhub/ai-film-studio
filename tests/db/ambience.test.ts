@@ -45,6 +45,18 @@ describe('rumlyd i databasen', () => {
     await as(db, service, (c) => c.query(`update public.generations set status = 'running' where id = $1`, [g.id]));
   });
 
+  it('en location med et referencebillede kan få rumlyd — versioner tælles pr. slags', async () => {
+    const x = await setup(true);
+    await as(db, service, async (c) => {
+      const t = await q(c, `insert into public.tasks(org_id, project_id, type, status, idempotency_key, created_by) values ($1, $2, 'asset.master_generate', 'approved', $3, $4) returning id`, [x.s.orgId, x.s.projectId, `r-${randomUUID()}`, x.s.ownerId]);
+      await c.query(`insert into public.generations(org_id, project_id, task_id, slot, asset_version_id, version, input, input_hash, cost_estimate_cents)
+        values ($1, $2, $3, 'reference', $4, 1, '{}', $5, 300)`, [x.s.orgId, x.s.projectId, t.id, x.versionId, 'b'.repeat(64)]);
+    });
+    await as(db, service, (c) => insertGen(c, x, 'asset_version_id'));
+    // To rumlyde med samme version på samme location er stadig ikke tilladt.
+    await expect(as(db, service, (c) => insertGen(c, x, 'asset_version_id'))).rejects.toThrow(/duplicate key/);
+  });
+
   it('rumlyd kan ikke hænge på et shot', async () => {
     const x = await setup(true);
     await expect(as(db, service, (c) => insertGen(c, x, 'shot_id'))).rejects.toThrow(/generation_target|violates|foreign key/);
