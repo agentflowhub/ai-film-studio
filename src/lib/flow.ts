@@ -82,7 +82,7 @@ function nextAction(d: FilmData, current: FlowStep['key'], waiting: number, now:
     return { kind: 'working', text: running ? `${running} ${running === 1 ? 'resultat' : 'resultater'} undervejs — de dukker op, når de er klar` : 'Der arbejdes — siden opdaterer sig selv', to: production };
   }
   const pk = d.plan?.packages;
-  const ready = pk ? [...pk.masters, ...pk.frames, ...pk.lines, ...pk.videos] : [];
+  const ready = pk ? [...pk.masters, ...pk.frames, ...pk.lines, ...pk.videos, ...(pk.sounds ?? [])] : [];
   const price = kr(ready.reduce((n, p) => n + p.costCents, 0));
   switch (current) {
     case 'brief':

@@ -452,3 +452,4 @@ fieldset { border: none; padding: 0; margin: 0; min-width: 0; }
 .review-audio { display: flex; gap: 8px; align-items: center; padding: 14px 10px; aspect-ratio: 16 / 9; }
 .review-audio audio { width: 100%; }
 .review-tile figcaption { display: grid; gap: 6px; padding: 8px 10px 10px; }
+.flow-next strong { color: inherit; }
