@@ -36,7 +36,7 @@ describe('filmens flow', () => {
   });
 
   it('peger på det, der kan startes, med pris', () => {
-    const pkg = { slot: 'start_frame' as const, shotId: 's', label: 'x', costCents: 200, pick: null, fallback: null };
+    const pkg = { slot: 'start_frame' as const, shotId: 's', label: 'x', costCents: 200, pick: null, fallback: null, fallbacks: [] };
     const f = filmFlow(film({ ...ready, plan: plan([shotPlan('draft', 'draft')], { frames: [pkg] }) }));
     expect(f.steps.find((s) => s.state === 'now')?.key).toBe('frames');
     expect(f.next.text).toBe('Start produktion: 1 klar · 2 kr.');

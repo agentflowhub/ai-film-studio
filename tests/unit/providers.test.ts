@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { HIGGSFIELD_MODELS, OPENAI_MODELS, priceEnvKey, providerSettings, withPrices } from '../../supabase/functions/_shared/providers/catalog.ts';
-import { createHiggsfield } from '../../supabase/functions/_shared/providers/higgsfield.ts';
+import { createHiggsfield, v2Duration } from '../../supabase/functions/_shared/providers/higgsfield.ts';
 import { createOpenAiImages } from '../../supabase/functions/_shared/providers/openai-images.ts';
 import { createRegistry } from '../../supabase/functions/_shared/providers/registry.ts';
 import { recommend } from '../../supabase/functions/_shared/providers/router.ts';
@@ -121,6 +121,59 @@ describe('Higgsfield (v1-protokol: params og job-sets)', () => {
   });
 });
 
+describe('Higgsfield (nyt API: Kling 3.0 og Seedance 2.0)', () => {
+  const video: GenerationRequest = { ...req, startFrameUrl: 'https://s/frame.png', durationSeconds: 2.5 };
+
+  it('sender startframen direkte i body uden lyd og gemmer request-id med præfiks', async () => {
+    const m = mockFetch(() => ({ json: { request_id: 'r1', status: 'queued' } }));
+    const a = createHiggsfield('9a76abcdef157c', settings.higgsfield, HIGGSFIELD_MODELS, m.fn);
+    expect(await a.submit('kling-3.0-pro', video, 'g:1')).toEqual({ providerJobId: 'req:r1' });
+    expect(m.calls[0]!.url).toBe('https://api.higgsfield.ai/kling-video/v3.0/pro/image-to-video');
+    expect(m.calls[0]!.headers.Authorization).toBe('Key 9a76abcdef157c');
+    expect(m.calls[0]!.body).toMatchObject({ image_url: 'https://s/frame.png', start_image_url: 'https://s/frame.png', duration: 3, generate_audio: false });
+    expect(m.calls[0]!.body).not.toHaveProperty('params');
+  });
+
+  it('Seedance har sit eget endpoint og mindst 4 sek.', async () => {
+    const m = mockFetch(() => ({ json: { request_id: 'r2' } }));
+    await createHiggsfield('k', settings.higgsfield, HIGGSFIELD_MODELS, m.fn).submit('seedance-2.0', video, 'g:1');
+    expect(m.calls[0]!.url).toBe('https://api.higgsfield.ai/bytedance/seedance-2.0/image-to-video');
+    expect(m.calls[0]!.body).toMatchObject({ image_url: 'https://s/frame.png', duration: 4 });
+  });
+
+  it('længden er hele sekunder inden for modellens grænser', () => {
+    expect([v2Duration('kling-3.0-pro', 1), v2Duration('kling-3.0-pro', 6.2), v2Duration('kling-3.0-pro', 20), v2Duration('seedance-2.0', undefined)]).toEqual([3, 7, 15, 5]);
+  });
+
+  it('en afvisning (422) er bekræftet og viser Higgsfields forklaring, så reserven kan prøves', async () => {
+    const m = mockFetch(() => ({ status: 422, json: { detail: [{ loc: ['body', 'input_image'], msg: 'Field required' }] } }));
+    const err = await createHiggsfield('k', settings.higgsfield, HIGGSFIELD_MODELS, m.fn).submit('kling-3.0-pro', video, 'x').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ProviderRejectedError);
+    expect((err as Error).message).toBe('Higgsfield afviste kaldet (422): input_image: Field required');
+  });
+
+  it('følger requesten og henter videoen fra video.url', async () => {
+    const calls: string[] = [];
+    const s = async (json: unknown) => createHiggsfield('k', settings.higgsfield, HIGGSFIELD_MODELS, mockFetch((c) => { calls.push(c.url); return { json }; }).fn).status('req:r1');
+    expect(await s({ status: 'queued' })).toEqual({ state: 'queued' });
+    expect(await s({ status: 'in_progress' })).toEqual({ state: 'running' });
+    expect(await s({ status: 'completed', video: { url: 'https://cdn/k.mp4' } })).toEqual({ state: 'succeeded', files: [{ url: 'https://cdn/k.mp4', mime: 'video/mp4' }] });
+    expect(await s({ status: 'completed' })).toMatchObject({ state: 'failed', retryable: true });
+    expect(await s({ status: 'nsfw' })).toMatchObject({ state: 'failed', retryable: false });
+    expect(calls[0]).toBe('https://api.higgsfield.ai/requests/r1/status');
+  });
+
+  it('et job i kø bedes stoppet; kun den efterfølgende status afgør, om det er stoppet', async () => {
+    let n = 0;
+    const m = mockFetch((c) => (c.url.endsWith('/cancel') ? { json: {} } : { json: { status: n++ === 0 ? 'queued' : 'canceled' } }));
+    expect(await createHiggsfield('k', settings.higgsfield, HIGGSFIELD_MODELS, m.fn).cancel('req:r1')).toBe(true);
+    expect(m.calls.map((c) => c.url)).toContain('https://api.higgsfield.ai/requests/r1/cancel');
+    const running = mockFetch(() => ({ json: { status: 'in_progress' } }));
+    expect(await createHiggsfield('k', settings.higgsfield, HIGGSFIELD_MODELS, running.fn).cancel('req:r1')).toBe(false);
+    expect(running.calls.some((c) => c.url.endsWith('/cancel'))).toBe(false);
+  });
+});
+
 describe('registry og priser', () => {
   it('en provider er kun med, når dens hemmelighed er sat', () => {
     expect(createRegistry(() => undefined).models).toEqual([]);
@@ -146,7 +199,12 @@ describe('registry og priser', () => {
     expect(frame.pick).toMatchObject({ provider: 'openai', model: 'gpt-image-2.5-sunburst' });
     expect(frame.fallback).toMatchObject({ provider: 'openai', model: 'gpt-image-2.5-flare' });
     const clip = recommend(models, { slot: 'video', referenceImages: 1, durationSeconds: 5, movement: 'optical_zoom', hasCharacters: true }, { allowSimulated: false });
-    expect(clip.pick).toMatchObject({ provider: 'higgsfield', model: 'dop-preview' });
-    expect(clip.fallback).toMatchObject({ provider: 'higgsfield', model: 'dop-turbo' });
+    expect(clip.pick).toMatchObject({ provider: 'higgsfield', model: 'kling-3.0-pro' });
+    expect(clip.reserves.map((m) => m.model)).toEqual(['seedance-2.0', 'dop-preview']);
+  });
+
+  it('video vælges efter kvalitet, også uden karakterer', () => {
+    const models = createRegistry((k) => ({ HIGGSFIELD_CREDENTIALS: 'keyid:secret' })[k]).models;
+    expect(recommend(models, { slot: 'video', referenceImages: 1, durationSeconds: 2, hasCharacters: false }, { allowSimulated: false }).pick?.model).toBe('kling-3.0-pro');
   });
 });

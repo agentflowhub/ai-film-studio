@@ -11,7 +11,7 @@ const ok = [{ ok: true, text: 'ok' }];
 const no = [{ ok: false, text: 'mangler' }];
 
 function plan(over: Partial<ShotPlanView> = {}): ShotPlanView {
-  const reco = { pick: null, fallback: null, candidates: [], excluded: [], reasons: [], manual: false };
+  const reco = { pick: null, fallback: null, reserves: [], candidates: [], excluded: [], reasons: [], manual: false };
   return {
     shotId: 's1', code: '01',
     frame: { status: 'draft', generationId: null }, video: { status: 'draft', generationId: null },

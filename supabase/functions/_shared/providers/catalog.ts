@@ -22,18 +22,28 @@ export const OPENAI_MODELS: ModelInfo[] = [
   },
 ];
 
-// Higgsfield DoP: image-to-video fra én startframe. Kamerabevægelsen beskrives
-// i prompten. API'et kender kun 'dop-lite', 'dop-preview' og 'dop-turbo';
-// 'dop-preview' er standardkvaliteten. Klippets længde bestemmes af modellen; sæt min/max her, når de
-// er bekræftet, så routeren kan fravælge shots, der ikke passer.
+// Video fra én startframe via Higgsfield. Kamerabevægelsen beskrives i
+// prompten. Kæden er Kling 3.0 (bedst til fysik, hænder og ansigter, der
+// holder) → Seedance 2.0 → DoP. Kling og Seedance laver 3–15 hhv. 4–15 sek.;
+// et kortere shot får et lidt længere klip, som filmen skæres til. DoP's
+// API kender kun 'dop-lite', 'dop-preview' og 'dop-turbo'.
+// Priserne er skøn (Kling fra ca. 0,07 USD/sek.) — afstem dem med Higgsfield.
 export const HIGGSFIELD_MODELS: ModelInfo[] = [
   {
+    provider: 'higgsfield', model: 'kling-3.0-pro', label: 'Kling 3.0 Pro (Higgsfield)',
+    capabilities: ['image_to_video'], maxReferenceImages: 1, maxSeconds: 15, movements: ALL_MOVEMENTS, priceCents: 800, quality: 3,
+  },
+  {
+    provider: 'higgsfield', model: 'seedance-2.0', label: 'Seedance 2.0 (Higgsfield)',
+    capabilities: ['image_to_video'], maxReferenceImages: 1, maxSeconds: 15, movements: ALL_MOVEMENTS, priceCents: 1200, quality: 3,
+  },
+  {
     provider: 'higgsfield', model: 'dop-preview', label: 'Higgsfield DoP (standard)',
-    capabilities: ['image_to_video'], maxReferenceImages: 1, movements: ALL_MOVEMENTS, priceCents: 600, quality: 3,
+    capabilities: ['image_to_video'], maxReferenceImages: 1, movements: ALL_MOVEMENTS, priceCents: 600, quality: 2,
   },
   {
     provider: 'higgsfield', model: 'dop-turbo', label: 'Higgsfield DoP (turbo)',
-    capabilities: ['image_to_video'], maxReferenceImages: 1, movements: ALL_MOVEMENTS, priceCents: 400, quality: 2,
+    capabilities: ['image_to_video'], maxReferenceImages: 1, movements: ALL_MOVEMENTS, priceCents: 400, quality: 1,
   },
 ];
 

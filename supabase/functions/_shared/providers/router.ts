@@ -17,6 +17,8 @@ export interface Need {
 export interface Recommendation {
   pick: ModelInfo | null;
   fallback: ModelInfo | null;
+  // Reserverne i den rækkefølge, de prøves (fallback er den første).
+  reserves: ModelInfo[];
   candidates: ModelInfo[];
   excluded: { model: ModelInfo; why: string }[];
   reasons: string[];
@@ -58,11 +60,13 @@ export function recommend(
     if (why) excluded.push({ model: m, why });
     else candidates.push(m);
   }
-  // Karakterer: kvalitet først. Ellers: billigst blandt de bedste.
-  candidates.sort((a, b) => (need.hasCharacters ? b.quality - a.quality || a.priceCents - b.priceCents : a.priceCents - b.priceCents || b.quality - a.quality));
+  // Karakterer og video: kvalitet først. Ellers: billigst blandt de bedste.
+  candidates.sort((a, b) => (need.hasCharacters || need.slot === 'video' ? b.quality - a.quality || a.priceCents - b.priceCents : a.priceCents - b.priceCents || b.quality - a.quality));
   const chosen = opts.choice ? candidates.find((m) => `${m.provider}/${m.model}` === opts.choice) ?? null : null;
   const pick = chosen ?? candidates[0] ?? null;
   const fallback = candidates.find((m) => m !== pick && m.provider !== pick?.provider) ?? candidates.find((m) => m !== pick) ?? null;
+  // Højst to reserver: en generering har tre forsøg i alt.
+  const reserves = fallback ? [fallback, ...candidates.filter((m) => m !== pick && m !== fallback)].slice(0, 2) : [];
   const reasons: string[] = [];
   if (need.slot === 'dialogue') {
     reasons.push('dansk tale med karakterens faste stemme');
@@ -75,5 +79,5 @@ export function recommend(
     reasons.push(need.hasCharacters ? 'shottet har karakterer — kvalitet og referencer vægtes højest' : 'ingen karakterer — pris vægtes højest');
     reasons.push(`${need.referenceImages} referencebilleder`);
   }
-  return { pick, fallback, candidates, excluded, reasons, manual: !!chosen };
+  return { pick, fallback, reserves, candidates, excluded, reasons, manual: !!chosen };
 }

@@ -33,7 +33,7 @@ interface Gen {
   shot_id: string | null;
   asset_version_id: string | null;
   version: number;
-  input: { prompt: string; pick: { provider: string; model: string } | null; fallback: { provider: string; model: string } | null; voice_id?: string };
+  input: { prompt: string; pick: { provider: string; model: string } | null; fallback: { provider: string; model: string } | null; fallbacks?: { provider: string; model: string }[]; voice_id?: string };
   cost_estimate_cents: number;
 }
 interface Attempt {
@@ -98,13 +98,14 @@ async function buildRequest(admin: Admin, g: Gen): Promise<GenerationRequest> {
   return req;
 }
 
-// Reserven, hvis den ikke allerede er prøvet (samme model to gange giver ingen mening).
+// Den første reserve i kæden, der ikke allerede er prøvet (samme model to
+// gange giver ingen mening). Ældre genereringer har kun én reserve.
 async function untriedFallback(admin: Admin, g: Gen): Promise<{ provider: string; model: string } | null> {
-  const fb = g.input.fallback;
-  if (!fb) return null;
+  const chain = g.input.fallbacks ?? (g.input.fallback ? [g.input.fallback] : []);
+  if (!chain.length) return null;
   const tried = await admin.from('generation_attempts').select('provider, model').eq('generation_id', g.id);
   if (tried.error) throw tried.error;
-  return tried.data.some((t) => t.provider === fb.provider && t.model === fb.model) ? null : fb;
+  return chain.find((fb) => !tried.data.some((t) => t.provider === fb.provider && t.model === fb.model)) ?? null;
 }
 
 async function failGeneration(admin: Admin, g: Gen, reason: string, stopConfirmed: boolean): Promise<void> {

@@ -119,7 +119,7 @@ serve('production-start', ProductionStartRequestSchema, async ({ admin, userId, 
         .insert({
           org_id: project.org_id, project_id: project.id, task_id: child.data.id, slot: item.slot, ...target,
           version: ((prev.data?.version as number | undefined) ?? 0) + 1,
-          input: { prompt, pick: pkg!.pick, fallback: pkg!.fallback, ...(voiceId ? { voice_id: voiceId } : {}) }, input_hash: hash, spec_version: specVersion,
+          input: { prompt, pick: pkg!.pick, fallback: pkg!.fallback, fallbacks: pkg!.fallbacks, ...(voiceId ? { voice_id: voiceId } : {}) }, input_hash: hash, spec_version: specVersion,
           cost_estimate_cents: pkg!.costCents,
         })
         .select('id')

@@ -117,6 +117,18 @@ export interface PackageItem {
   costCents: number;
   pick: { provider: string; model: string; label: string } | null;
   fallback: { provider: string; model: string } | null;
+  // Hele kæden af reserver (fallback er den første); prøves i rækkefølge.
+  fallbacks: { provider: string; model: string }[];
+}
+
+// Reservationen dækker den dyreste model i kæden, og kæden følger med i genereringen.
+function chain(r: Recommendation) {
+  return {
+    costCents: Math.max(r.pick?.priceCents ?? 0, ...r.reserves.map((m) => m.priceCents)),
+    pick: r.pick ? { provider: r.pick.provider, model: r.pick.model, label: r.pick.label } : null,
+    fallback: r.fallback ? { provider: r.fallback.provider, model: r.fallback.model } : null,
+    fallbacks: r.reserves.map((m) => ({ provider: m.provider, model: m.model })),
+  };
 }
 
 export interface SoundPlan {
@@ -274,9 +286,7 @@ export async function planProject(input: PlanInput): Promise<ProjectPlan> {
 
     const item = (slot: 'start_frame' | 'video' | 'dialogue', r: Recommendation): PackageItem => ({
       slot, shotId: s.id, label: `${s.code} · ${slot === 'start_frame' ? 'startframe' : slot === 'dialogue' ? (voiceover ? 'voiceover' : 'replik') : speech ? 'talende video' : 'video'}`,
-      costCents: Math.max(r.pick?.priceCents ?? 0, r.fallback?.priceCents ?? 0),
-      pick: r.pick ? { provider: r.pick.provider, model: r.pick.model, label: r.pick.label } : null,
-      fallback: r.fallback ? { provider: r.fallback.provider, model: r.fallback.model } : null,
+      ...chain(r),
     });
     const redo: SlotStatus[] = ['draft', 'rejected', 'outdated', 'failed'];
     if (redo.includes(frame.status) && ok(frameGates)) packages.frames.push(item('start_frame', reco.start_frame));
@@ -300,9 +310,7 @@ export async function planProject(input: PlanInput): Promise<ProjectPlan> {
     const r = recommend(input.models, { slot: 'reference', referenceImages: v.referenceCount, hasCharacters: a.kind === 'character' }, { allowSimulated: input.allowSimulated });
     if (!r.pick) continue;
     packages.masters.push({
-      slot: 'reference', assetVersionId: v.id, label: `${a.name} v${v.version} · master-referencer`, costCents: Math.max(r.pick.priceCents, r.fallback?.priceCents ?? 0),
-      pick: { provider: r.pick.provider, model: r.pick.model, label: r.pick.label },
-      fallback: r.fallback ? { provider: r.fallback.provider, model: r.fallback.model } : null,
+      slot: 'reference', assetVersionId: v.id, label: `${a.name} v${v.version} · master-referencer`, ...chain(r),
     });
   }
 
@@ -321,9 +329,7 @@ export async function planProject(input: PlanInput): Promise<ProjectPlan> {
     const r = recommend(input.models, { slot: 'ambience', referenceImages: 0, hasCharacters: false }, { allowSimulated: input.allowSimulated });
     if (!r.pick) continue;
     packages.sounds.push({
-      slot: 'ambience', assetVersionId: v.id, label: `${a.name} · rumlyd`, costCents: Math.max(r.pick.priceCents, r.fallback?.priceCents ?? 0),
-      pick: { provider: r.pick.provider, model: r.pick.model, label: r.pick.label },
-      fallback: r.fallback ? { provider: r.fallback.provider, model: r.fallback.model } : null,
+      slot: 'ambience', assetVersionId: v.id, label: `${a.name} · rumlyd`, ...chain(r),
     });
   }
 
